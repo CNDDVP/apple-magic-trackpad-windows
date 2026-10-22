@@ -1,0 +1,87 @@
+{
+  "Time": "2026-10-22T17:42:59.1706363+08:00",
+  "UserSettings": {
+    "User": "<DOMAIN>\\<USERNAME>",
+    "Applied": false,
+    "BeforeFlags": 439,
+    "BeforeSpeed": 14,
+    "ApiFlags": 439,
+    "ApiCursorSpeed": 14,
+    "ApiTapAndDrag": false,
+    "ApiPan": true,
+    "ApiZoom": true,
+    "RegistryCursorSpeed": 14,
+    "RegistryTapAndDrag": 0,
+    "RegistryPan": 1,
+    "RegistryZoom": 1
+  },
+  "Startup": {
+    "QuickLook": "\"%LOCALAPPDATA%\\Programs\\QuickLook\\QuickLook.exe\" /autorun",
+    "MagicForceClick": "\"%LOCALAPPDATA%\\Programs\\MagicTrackpad\\MagicForceClick.exe\" 180"
+  },
+  "Task": {
+    "State": "Ready",
+    "Triggers": [
+      "MSFT_TaskLogonTrigger",
+      "MSFT_TaskTimeTrigger",
+      "MSFT_TaskEventTrigger"
+    ],
+    "LastRunTime": "2026-10-22T17:41:26.0000000+08:00",
+    "LastTaskResult": 0
+  },
+  "AutoFix": {
+    "Time": "2026-10-22T17:41:31.7037209+08:00",
+    "Events": [
+      {
+        "Step": "PowerSettings",
+        "Status": "Checked",
+        "Detail": "6 present Apple nodes"
+      },
+      {
+        "Step": "IgnoreButtonFinger",
+        "Status": "Verified0",
+        "Detail": "HKLM:\\SYSTEM\\CurrentControlSet\\Services\\AmtPtpHidFilter\\Parameters"
+      },
+      {
+        "Step": "IgnoreButtonFinger",
+        "Status": "Verified0",
+        "Detail": "HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\WUDF\\Services\\AmtPtpDeviceUsbUm\\Parameters"
+      },
+      {
+        "Step": "UsbReload",
+        "Status": "UnavailableOrFailed",
+        "Detail": "使用“1”个参数调用“Connect”时发生异常:“操作已超时。”"
+      },
+      {
+        "Step": "BluetoothReload",
+        "Status": "Success",
+        "Detail": "IOCTL 0x00222000"
+      }
+    ]
+  },
+  "Processes": [
+    {
+      "Name": "MagicForceClick",
+      "Id": 12924,
+      "Path": "%LOCALAPPDATA%\\Programs\\MagicTrackpad\\MagicForceClick.exe"
+    },
+    {
+      "Name": "QuickLook",
+      "Id": 43292,
+      "Path": "%LOCALAPPDATA%\\Programs\\QuickLook\\QuickLook.exe"
+    }
+  ],
+  "Checks": {
+    "PowerShellSyntax": "Passed",
+    "ForceClickCompilation": "Passed",
+    "ZipCRC": "Passed",
+    "QuickLookUniqueFiles": 1346,
+    "PluginDlls": 21,
+    "PluginDirectories": 20,
+    "FullInstallerExecuted": false,
+    "DriversReinstalled": false,
+    "PhysicalUsbTest": "Pending",
+    "SleepWakeTest": "Pending",
+    "NextLogonAutostartTest": "Pending"
+  }
+}

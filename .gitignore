@@ -1,0 +1,12 @@
+# Runtime generated logs and state files
+*.log
+*.last.json
+*.candidate.exe
+Install.result.json
+
+# Reassembled zip (automatically built from .part1 and .part2 during install)
+QuickLook_Portable_Clean.zip
+
+# OS metadata
+.DS_Store
+Thumbs.db
