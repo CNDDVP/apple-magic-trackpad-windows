@@ -1,0 +1,35 @@
+name: Package release assets
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to package
+        required: true
+        default: v1.1.0
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+      - name: Build and run behavior and integration tests
+        shell: powershell
+        run: .\Build.ps1
+      - name: Verify checksums and build release packages
+        run: python tools/Package_Release.py
+      - name: Upload assets to the existing release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          gh release upload $env:RELEASE_TAG artifacts/release/* --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) { throw 'Release upload failed.' }

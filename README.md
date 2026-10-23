@@ -58,7 +58,7 @@ cd apple-magic-trackpad-windows
 - `MagicForceClick.status.json`：当前生效设置、RawInput注册、有效/重复扫描帧和计时重置统计。它是诊断状态，不作为设备实际手势正常的唯一证据。
 - `MagicForceClick.Core.cs`：可离线测试的扫描时间、曲线、按压状态机；`MagicForceClick.Settings.cs`：设置窗口。
 - `Build.ps1`：用.NET Framework编译器构建程序并运行39项行为测试、4项配置/界面集成测试。`tests/Test-UpdateRollback.ps1`另验证更新与回退；真实程序已运行时还测试启动失败自动恢复，总计5项。
-- `.github/workflows/build.yml`：Windows构建和行为/集成测试。
+- `.github/workflows/build.yml`：Windows构建和行为/集成测试；发布Release后，`release.yml`校验文件并自动生成、上传更新包、完整包、基线包和校验清单。
 - `SHA256SUMS.json`：自动生成的发布文件大小与SHA256；不包含自身、构建缓存或个人回退快照。
 
 ```powershell
