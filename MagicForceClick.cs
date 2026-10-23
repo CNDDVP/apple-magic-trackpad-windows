@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -8,6 +8,9 @@ using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32.SafeHandles;
+
+[assembly: System.Reflection.AssemblyVersion("1.1.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.1.0.0")]
 
 namespace MagicForceClick
 {
@@ -59,6 +62,13 @@ namespace MagicForceClick
         {
             EnablePerMonitorDpiAwareness();
 
+            if (args.Length > 0 && args[0] == "--settings")
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                Application.Run(new SettingsForm(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MagicForceClick.json")));
+                return;
+            }
             bool createdNew;
             using (var mutex = new Mutex(true, "Global\\MagicTrackpad2_ForceClick_Daemon", out createdNew))
             {
@@ -66,7 +76,7 @@ namespace MagicForceClick
                 {
                     return; // 已在后台运行
                 }
-                int threshold = STAGE2_PRESSURE_THRESHOLD;
+                int? threshold = null;
                 int custom;
                 if (args.Length > 0 && int.TryParse(args[0], out custom) && custom >= 120 && custom <= 250)
                 {
@@ -87,17 +97,20 @@ namespace MagicForceClick
         private const uint RIM_TYPEHID = 2;
         private const uint RIDEV_INPUTSINK = 0x00000100;
 
-        private readonly int _threshold;
-        private bool _stage1Active;
-        private bool _stage2Fired;
-        private int _anchorX;
-        private int _anchorY;
-        private long _lastFireTick;
+        private volatile ForceClickOptions _options;
+        private readonly int? _legacyThreshold;
+        private readonly string _configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MagicForceClick.json");
+        private readonly ScanTimeMotion _motion = new ScanTimeMotion();
+        private readonly PressGesture _press = new PressGesture();
+        private System.Windows.Forms.Timer _configTimer;
+        private DateTime _configWriteTime;
+        private IntPtr _inputDevice;
+        private int _previewEpoch;
         private long _lastDiagnosticTick;
-        private bool _loggedReport;
-        private bool _diagnosticButtonDown;
+        private double _lastStatusTick;
+        private bool _loggedReport, _diagnosticButtonDown;
         private int _diagnosticPeak;
-
+        private bool _rawInputRegistered;
         // === 多屏 PPI 自动等速补偿 + 类 macOS S型动态加速曲线 状态 ===
         private struct MonitorScaleInfo
         {
@@ -111,22 +124,9 @@ namespace MagicForceClick
 
         private MonitorScaleInfo[] _monitors = new MonitorScaleInfo[0];
 
-        // S型加速曲线参数（针对妙控板 ~46 units/mm 硬件分辨率调优 - 提速版）
-        // v 单位：HID units / ms（1 unit/ms ≈ 2.17 cm/s）
-        private double _curveMinGain = 0.95;   // 极慢速微操保持接近 1:1 精准度，不发飘也不拖泥带水
-        private double _curveMaxGain = 3.40;   // 快速甩动跨屏最大增益（一指轻甩即可横跨 8320px 三联屏）
-        private double _curveMidSpeed = 4.5;   // S曲线拐点速度前移（units/ms），中常速移动即明显提速
-        private double _curvePower = 1.85;     // S曲线指数，提速介入更早更顺滑
-
-        private bool _wasSingleFinger;
-        private uint _prevContactId;
-        private int _prevPadX;
-        private int _prevPadY;
-        private long _prevTimestamp;
-        private double _smoothedSpeed;
         private POINT _lastSetPos;
-        private double _remX;
-        private double _remY;
+        private double _remX, _remY;
+        private static double NowMs { get { return Stopwatch.GetTimestamp() * 1000.0 / Stopwatch.Frequency; } }
 
         private static void Log(string message)
         {
@@ -140,9 +140,10 @@ namespace MagicForceClick
             catch { }
         }
 
-        public RawInputSinkForm(int threshold)
+        public RawInputSinkForm(int? threshold)
         {
-            _threshold = threshold;
+            _legacyThreshold = threshold;
+            LoadConfiguration(true);
             ShowInTaskbar = false;
             FormBorderStyle = FormBorderStyle.None;
             WindowState = FormWindowState.Minimized;
@@ -158,11 +159,19 @@ namespace MagicForceClick
             // HID Usage Page 0x0D (Digitizer), Usage 0x05 (Touch Pad)
             dev[0].usUsagePage = 0x000D;
             dev[0].usUsage = 0x0005;
-            dev[0].dwFlags = RIDEV_INPUTSINK;
+            dev[0].dwFlags = RIDEV_INPUTSINK | 0x2000; // RIDEV_DEVNOTIFY
             dev[0].hwndTarget = Handle;
             bool registered = RegisterRawInputDevices(dev, 1, (uint)Marshal.SizeOf(typeof(RAWINPUTDEVICE)));
-            Log("RawInput registration=" + registered + "; error=" + (registered ? 0 : Marshal.GetLastWin32Error()) + "; threshold=" + _threshold);
+            _rawInputRegistered = registered;
+            Log("MagicForceClick 1.1.0; RawInput registration=" + registered + "; error=" + (registered ? 0 : Marshal.GetLastWin32Error()) + "; threshold=" + _options.ForceClickThreshold);
             RefreshMonitors();
+            WriteStatus();
+            _configTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+            _configTimer.Tick += delegate {
+                LoadConfiguration(false);
+                if (NowMs - _lastStatusTick >= 5000) WriteStatus();
+            };
+            _configTimer.Start();
         }
 
         private void RefreshMonitors()
@@ -271,14 +280,56 @@ namespace MagicForceClick
             return bestScale;
         }
 
-        private double ComputeMacSCurveGain(double speedUnitsPerMs)
+        private void LoadConfiguration(bool first)
         {
-            if (speedUnitsPerMs <= 0.001)
-                return _curveMinGain;
-            double ratio = speedUnitsPerMs / _curveMidSpeed;
-            double pow = Math.Pow(ratio, _curvePower);
-            double s = pow / (1.0 + pow);
-            return _curveMinGain + (_curveMaxGain - _curveMinGain) * s;
+            DateTime stamp = File.Exists(_configPath) ? File.GetLastWriteTimeUtc(_configPath) : DateTime.MinValue;
+            if (!first && stamp == _configWriteTime) return;
+            _configWriteTime = stamp;
+            try
+            {
+                ForceClickOptions candidate = ForceClickOptions.Load(_configPath);
+                if (_legacyThreshold.HasValue) candidate.ForceClickThreshold = _legacyThreshold.Value;
+                candidate.Validate();
+                _options = candidate;
+                _motion.Reset(); _press.CancelHeld(); Interlocked.Increment(ref _previewEpoch);
+                _remX = _remY = 0;
+                Log("Configuration loaded; preview=" + candidate.EnableForceClick + "; acceleration=" + candidate.EnableAcceleration + "; monitor=" + candidate.EnableMonitorCompensation);
+            }
+            catch (Exception ex)
+            {
+                if (_options == null) _options = new ForceClickOptions();
+                Log("Configuration rejected; keeping last valid options: " + ex.Message);
+            }
+        }
+
+        [System.Runtime.Serialization.DataContract]
+        public sealed class RuntimeStatus
+        {
+            [System.Runtime.Serialization.DataMember] public string Version = "1.1.0";
+            [System.Runtime.Serialization.DataMember] public DateTime TimeUtc = DateTime.UtcNow;
+            [System.Runtime.Serialization.DataMember] public long ValidScanFrames, DuplicateScanFrames, Discontinuities;
+            [System.Runtime.Serialization.DataMember] public bool PressBlocked;
+            [System.Runtime.Serialization.DataMember] public bool RawInputRegistered;
+            [System.Runtime.Serialization.DataMember] public ForceClickOptions Options;
+        }
+        private void WriteStatus()
+        {
+            _lastStatusTick = NowMs;
+            try
+            {
+                var status = new RuntimeStatus { Options = _options, ValidScanFrames = _motion.ValidFrames, DuplicateScanFrames = _motion.DuplicateFrames, Discontinuities = _motion.Discontinuities, PressBlocked = _press.Blocked, RawInputRegistered = _rawInputRegistered };
+                string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MagicForceClick.status.json");
+                string temp = path + ".tmp";
+                using (var stream = File.Create(temp)) new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(RuntimeStatus)).WriteObject(stream, status);
+                if (File.Exists(path)) File.Replace(temp, path, null); else File.Move(temp, path);
+            }
+            catch (Exception ex) { Log("Status write failed: " + ex.Message); }
+        }
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && _configTimer != null) _configTimer.Dispose();
+            Interlocked.Increment(ref _previewEpoch);
+            base.Dispose(disposing);
         }
 
         protected override void SetVisibleCore(bool value)
@@ -294,6 +345,11 @@ namespace MagicForceClick
             if (m.Msg == WM_INPUT)
             {
                 ProcessRawInput(m.LParam);
+            }
+            else if (m.Msg == 0x00FE) // WM_INPUT_DEVICE_CHANGE
+            {
+                _motion.Reset(); _press.CancelHeld(); Interlocked.Increment(ref _previewEpoch);
+                _inputDevice = IntPtr.Zero;
             }
             else if (m.Msg == WM_DISPLAYCHANGE)
             {
@@ -327,7 +383,7 @@ namespace MagicForceClick
                     _loggedReport = true;
                     Log("First HID report length=" + dwSizeHid + "; count=" + dwCount);
                 }
-                if (dwSizeHid < 112 || dwCount == 0)
+                if (dwSizeHid != 112 || dwCount == 0 || (ulong)headerSize + 8UL + (ulong)dwSizeHid * dwCount > dwSize)
                     return;
 
                 IntPtr rawDataPtr = IntPtr.Add(hidPtr, 8);
@@ -335,7 +391,7 @@ namespace MagicForceClick
                 for (uint i = 0; i < dwCount; i++)
                 {
                     Marshal.Copy(IntPtr.Add(rawDataPtr, (int)(i * dwSizeHid)), report, 0, (int)dwSizeHid);
-                    HandleMt2Report(report);
+                    HandleMt2Report(report, header.hDevice);
                 }
             }
             finally
@@ -344,183 +400,68 @@ namespace MagicForceClick
             }
         }
 
-        private void HandleMt2Report(byte[] r)
+        private void HandleMt2Report(byte[] report, IntPtr device)
         {
-            // Both v2.2 miniports use ReportID 0x05 for the 112-byte MT2 report.
-            if (r.Length < 112 || r[0] != 0x05)
-                return;
-
-            byte c0Flags = r[1];
-            bool tipSwitch = (c0Flags & 0x02) != 0;
-            uint c0Id = BitConverter.ToUInt32(r, 2);
-            byte contactCount = r[108];
-            ushort c0X = (ushort)(r[6] | (r[7] << 8));
-            ushort c0Y = (ushort)(r[8] | (r[9] << 8));
-            ushort c0Pressure = (ushort)(r[14] | (r[15] << 8));
-            ushort mechForce = (ushort)(r[109] | (r[110] << 8));
-            byte isButtonClicked = r[111];
-
-            // === 1. 单指移动：三屏 PPI 等速补偿 + 类 macOS S型动态加速曲线 ===
-            if (contactCount == 1 && tipSwitch)
+            TrackpadSample sample;
+            if (!TrackpadSample.TryDecode(report, out sample)) return;
+            if (_inputDevice != IntPtr.Zero && _inputDevice != device)
             {
-                long nowTicks = Stopwatch.GetTimestamp();
-                POINT curPos;
-                GetCursorPos(out curPos);
+                _motion.Reset(); _press.CancelHeld(); Interlocked.Increment(ref _previewEpoch);
+            }
+            _inputDevice = device;
+            ForceClickOptions options = _options;
+            POINT position;
+            if (!GetCursorPos(out position)) return;
+            double now = NowMs;
+            MotionResult motion = _motion.Update(sample, now, options);
+            if (motion.ContinuityLost) { _press.CancelHeld(); Interlocked.Increment(ref _previewEpoch); }
+            bool preview = _press.Update(sample, position.X, position.Y, now, options);
+            if (!sample.Button || _press.Blocked) Interlocked.Increment(ref _previewEpoch);
 
-                if (_wasSingleFinger && c0Id == _prevContactId)
+            if (motion.Valid && motion.PadDistance > 0 && (options.EnableAcceleration || options.EnableMonitorCompensation))
+            {
+                int dx = position.X - _lastSetPos.X, dy = position.Y - _lastSetPos.Y;
+                if ((dx != 0 || dy != 0) && Math.Abs(dx) < 800 && Math.Abs(dy) < 800)
                 {
-                    double dtMs = (nowTicks - _prevTimestamp) * 1000.0 / Stopwatch.Frequency;
-                    if (dtMs >= 0.5 && dtMs <= 65.0)
-                    {
-                        int dPadX = (int)c0X - _prevPadX;
-                        int dPadY = (int)c0Y - _prevPadY;
-                        double padDist = Math.Sqrt((double)dPadX * dPadX + (double)dPadY * dPadY);
-                        double instSpeed = padDist / dtMs; // HID units / ms
-                        _smoothedSpeed = 0.55 * instSpeed + 0.45 * _smoothedSpeed;
-
-                        int winDx = curPos.X - _lastSetPos.X;
-                        int winDy = curPos.Y - _lastSetPos.Y;
-
-                        if ((winDx != 0 || winDy != 0) && Math.Abs(winDx) < 800 && Math.Abs(winDy) < 800)
-                        {
-                            double monScale = GetMonitorScaleAt(curPos.X, curPos.Y);
-                            double curveGain = ComputeMacSCurveGain(_smoothedSpeed);
-                            double totalScale = monScale * curveGain;
-
-                            double targetDx = winDx * totalScale + _remX;
-                            double targetDy = winDy * totalScale + _remY;
-                            int applyDx = (int)Math.Round(targetDx);
-                            int applyDy = (int)Math.Round(targetDy);
-                            _remX = targetDx - applyDx;
-                            _remY = targetDy - applyDy;
-
-                            int newX = _lastSetPos.X + applyDx;
-                            int newY = _lastSetPos.Y + applyDy;
-
-                            if (newX != curPos.X || newY != curPos.Y)
-                            {
-                                SetCursorPos(newX, newY);
-                                GetCursorPos(out curPos);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        _smoothedSpeed = 0;
-                        _remX = 0;
-                        _remY = 0;
-                    }
+                    double scale = PointerGain.Combined(motion.Speed, GetMonitorScaleAt(position.X, position.Y), sample.Button, options);
+                    double targetX = dx * scale + _remX, targetY = dy * scale + _remY;
+                    int applyX = (int)Math.Round(targetX), applyY = (int)Math.Round(targetY);
+                    _remX = targetX - applyX; _remY = targetY - applyY;
+                    int x = _lastSetPos.X + applyX, y = _lastSetPos.Y + applyY;
+                    if (x != position.X || y != position.Y) { SetCursorPos(x, y); GetCursorPos(out position); }
                 }
-                else
-                {
-                    _smoothedSpeed = 0;
-                    _remX = 0;
-                    _remY = 0;
-                }
-
-                _wasSingleFinger = true;
-                _prevContactId = c0Id;
-                _prevPadX = c0X;
-                _prevPadY = c0Y;
-                _prevTimestamp = nowTicks;
-                _lastSetPos = curPos;
             }
-            else
+            else { _remX = _remY = 0; }
+            _lastSetPos = position;
+
+            if (sample.Button && !_diagnosticButtonDown) { _diagnosticPeak = sample.Pressure; Log("ButtonDown pressure=" + sample.Pressure); }
+            if (sample.Button) _diagnosticPeak = Math.Max(_diagnosticPeak, sample.Pressure);
+            if (!sample.Button && _diagnosticButtonDown) Log("ButtonUp peak=" + _diagnosticPeak + "; previewBlocked=" + _press.Blocked);
+            _diagnosticButtonDown = sample.Button;
+            if (now - _lastDiagnosticTick >= 1000 && sample.ContactCount > 0)
             {
-                _wasSingleFinger = false;
-                _smoothedSpeed = 0;
-                _remX = 0;
-                _remY = 0;
+                _lastDiagnosticTick = (long)now;
+                Log("ScanTime=" + sample.ScanTime + "; contacts=" + sample.ContactCount + "; pressure=" + sample.Pressure + "; validScanFrames=" + _motion.ValidFrames);
             }
-
-            // === 2. 二段式重压预览（Force Click） ===
-            int pressure = Math.Max((int)c0Pressure, (int)mechForce);
-            bool diagnosticDown = (isButtonClicked & 1) != 0;
-            if (diagnosticDown && !_diagnosticButtonDown)
+            if (preview)
             {
-                _diagnosticPeak = pressure;
-                Log("ButtonDown pressure=" + pressure + "; contacts=" + contactCount);
-            }
-            if (diagnosticDown)
-                _diagnosticPeak = Math.Max(_diagnosticPeak, pressure);
-            if (!diagnosticDown && _diagnosticButtonDown)
-                Log("ButtonUp peak=" + _diagnosticPeak);
-            _diagnosticButtonDown = diagnosticDown;
-            long diagnosticNow = (long)(uint)Environment.TickCount;
-            if (contactCount > 0 && diagnosticNow - _lastDiagnosticTick >= 1000)
-            {
-                _lastDiagnosticTick = diagnosticNow;
-                Log("ReportID=" + r[0] + "; Contact count=" + contactCount + "; pressure=" + pressure + "; clicked=" + isButtonClicked);
-            }
-
-            if (isButtonClicked == 0 || contactCount == 0 || pressure < 110)
-            {
-                _stage1Active = false;
-                if (pressure < 110 && isButtonClicked == 0)
-                {
-                    _stage2Fired = false;
-                }
-                return;
-            }
-
-            // 仅对单指重按触发二段深压预览（避免双指/三指手势误触）
-            if (contactCount != 1)
-                return;
-
-            if (!_stage1Active)
-            {
-                _stage1Active = true;
-                _anchorX = c0X;
-                _anchorY = c0Y;
-            }
-
-            if (_stage2Fired)
-                return;
-
-            // 如果手指已经大幅滑动（正在拖拽窗口/框选），则锁住不触发二段深压
-            if (Math.Abs(c0X - _anchorX) > 220 || Math.Abs(c0Y - _anchorY) > 220)
-            {
-                _stage2Fired = true;
-                return;
-            }
-
-            if (pressure >= _threshold)
-            {
-                long now = (long)(uint)Environment.TickCount;
-                if (now - _lastFireTick < 450)
-                    return;
-
-                _stage2Fired = true;
-                _lastFireTick = now;
-                ThreadPool.QueueUserWorkItem(_ => TriggerStage2ForceClick());
+                IntPtr hwnd = GetForegroundWindow();
+                int token = Interlocked.Increment(ref _previewEpoch);
+                ThreadPool.QueueUserWorkItem(delegate { TriggerStage2ForceClick(hwnd, token); });
             }
         }
-
-        private static void TriggerStage2ForceClick()
+        private bool PreviewCurrent(IntPtr hwnd, int token)
         {
-            string cls = GetForegroundWindowClass();
-            Log("Stage2 threshold reached; foreground=" + cls);
-            if (!IsFileManagerOrPreviewWindow(cls))
-            {
-                Log("Preview skipped outside Explorer/desktop/QuickLook");
-                return;
-            }
-            // The installed signed driver has no second-stage actuation command.
-            FireSecondStageHaptic();
-
-            // 2. 先释放左键按住状态，防止资源管理器处于“准备拖拽”态而吞掉预览热键
+            return token == Volatile.Read(ref _previewEpoch) && _options.EnableForceClick && hwnd != IntPtr.Zero && GetForegroundWindow() == hwnd;
+        }
+        private void TriggerStage2ForceClick(IntPtr hwnd, int token)
+        {
+            if (!PreviewCurrent(hwnd, token) || !IsFileManagerOrPreviewWindow(GetForegroundWindowClass())) return;
+            Log("Stage2 threshold reached; drag interlock passed");
             mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, UIntPtr.Zero);
             Thread.Sleep(25);
-
-            // 3. 判断当前窗口类型，触发对应二段深压动作
-            if (IsFileManagerOrPreviewWindow(cls))
-            {
-                // 在桌面 / 资源管理器 / QuickLook 预览窗：直接触发 QuickLook 空格秒预览（或 PowerToys Peek Ctrl+Space）
-                if (!TryInvokeQuickLookPipe())
-                {
-                    SendKey(VK_SPACE);
-                }
-            }
+            if (!PreviewCurrent(hwnd, token)) return;
+            if (!TryInvokeQuickLookPipe(hwnd, token) && PreviewCurrent(hwnd, token)) SendKey(VK_SPACE);
         }
 
         private static bool IsFileManagerOrPreviewWindow(string cls)
@@ -534,7 +475,7 @@ namespace MagicForceClick
                 || cls.StartsWith("HwndWrapper[QuickLook");
         }
 
-        private static bool TryInvokeQuickLookPipe()
+        private bool TryInvokeQuickLookPipe(IntPtr hwnd, int token)
         {
             try
             {
@@ -542,6 +483,7 @@ namespace MagicForceClick
                 using (var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.Out))
                 {
                     pipe.Connect(250);
+                    if (!PreviewCurrent(hwnd, token)) return true;
                     using (var writer = new StreamWriter(pipe))
                     {
                         writer.WriteLine("QuickLook.App.PipeMessages.Toggle||");

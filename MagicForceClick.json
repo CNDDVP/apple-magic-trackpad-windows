@@ -1,0 +1,17 @@
+{
+  "SchemaVersion": 1,
+  "EnableForceClick": true,
+  "EnableAcceleration": true,
+  "EnableMonitorCompensation": true,
+  "AccelerateWhilePressed": true,
+  "ForceClickThreshold": 180,
+  "DragCancelDistance": 220,
+  "DragCancelCursorPixels": 4,
+  "MinGain": 0.95,
+  "MaxGain": 3.4,
+  "MidSpeed": 4.5,
+  "CurvePower": 1.85,
+  "SpeedSmoothingMs": 10.018688658723,
+  "MaxFrameIntervalMs": 65,
+  "IdleResetMs": 250
+}

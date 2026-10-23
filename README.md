@@ -1,116 +1,72 @@
-# Apple Magic Trackpad Windows 11 Suite (驱动 + 原生手势同步 + Force Click 重压预览 + 自动自愈)
+﻿# Apple Magic Trackpad Windows Suite 1.1.0
 
-一套面向 **Windows 11 (24H2 / Build 26100+)** 的 **Apple Magic Trackpad (第 2 代 / 第 3 代 USB-C A3120 `PID_0324` / Lightning `PID_0265`)** 完整驱动、精确参数调优、Force Click 二段深压文件预览（联动 QuickLook）与后台自愈守护方案。
+Apple USB-C / Lightning 妙控板在 Windows 11 上的签名驱动、原生手势设置、深按 QuickLook 预览及维护工具。底层驱动仍为发行包 v2.2 / INF `2026.3982.1.1000`；本页的 **1.1.0 是工具套件版本**。
 
----
+## 1.1.0 的三项改进
 
-## 核心特性与解决痛点
+- **按设备扫描时间计算速度**：使用112字节、ReportID=0x05报文的ScanTime（100µs/计数，16位回绕），不再用处理消息的间隔估算速度。批量到达、重复帧、计数重启、接触ID切换和长时间停顿均有独立处理。
+- **拖拽与深按互斥**：从物理按下开始记录起点，不受普通按压力度低于110影响。手指移动超限、光标移动超限、多指或接触更换后，本次按压锁定为拖拽/取消预览，直到松开。异步预览还检查取消标记与前台窗口是否变化。
+- **独立开关与手感面板**：深按预览、S型加速、多屏补偿可独立关闭；可调慢/快增益、介入速度、曲线指数、压力阈值与拖拽保护。保存约1秒生效，无效编辑保留上一次有效配置。
 
-1. **签名驱动开箱即用（蓝牙 + USB 双分支同步）**
-   - 内置 `mac-precision-touchpad` v2.2 微软签名驱动（`AMD64` & `ARM64`，INF 版本 `2026.3982.1.1000`）。
-   - 同时配置蓝牙（`AmtPtpHidFilter`）与 USB（`AmtPtpDeviceUsbUm`）双注册表分支，强制开启 `IgnoreButtonFinger = 0`（允许物理按住触控板的同时单指继续滑动拖拽）与防误触（`PalmRejection = 1`、`IgnoreNearFingers = 1`）。
+默认沿用原有曲线 `0.95 / 3.40 / 4.5 / 1.85`、压力阈值180、Windows速度14。S型增益叠加在Windows输出上，并非替换Windows加速。多屏补偿仍沿用此前实现。没有新增独立的第二次震动。
 
-2. **Windows 11 原生触控板 API (`SPI_GET/SETTOUCHPADPARAMETERS`) 精确位掩码同步**
-   - 解决仅修改 `HKCU\...\PrecisionTouchPad` 注册表不即时生效、或重启/重连后系统设置与注册表脱节的问题。
-   - 通过 `SystemParametersInfoW` (`0x00AE` / `0x00AF`) 原生接口读取并按位修改 `TOUCHPAD_PARAMETERS_V1.userFlags`：
-     - **指针速度 (`CursorSpeed`)**：`14`（合法范围 `1~20`）
-     - **关闭“轻点两下并拖动” (`TapAndDrag`, `0x08`)**：消除快速连续移动/点击时的粘滞与误拖拽，保留清脆的物理按压拖拽
-     - **保留核心手势 (`userFlags = 439`)**：开启单指轻点 (`0x04`)、双指轻点右键 (`0x10`)、双指平滑滚动 (`0x80`)、双指捏合缩放 (`0x100`)、外接鼠标时保持启用 (`0x01`)，保留系统三指/四指多任务手势映射。
+## 已经配置好这台电脑：只升级工具
 
-3. **macOS 风格 Force Click（二段深压触发 QuickLook 空格预览）+ 多屏物理速度对齐（PPI 自适应补偿）+ 类 macOS S型动态加速曲线**
-   - `MagicForceClick.exe`（附完整 C# 源码 `MagicForceClick.cs`）开启 `PerMonitorV2` 物理像素感知，通过 Raw Input 监听 `ReportID = 0x05` 的 112 字节 MT2 原始触控报文。
-   - **任意新电脑多显示器 PPI 自动等速补偿**：启动及显示器热插拔（`WM_DISPLAYCHANGE`）时，自动通过 `EnumDisplaySettings` 与 `GetDeviceCaps(HORZSIZE)` 读取每块显示器的 EDID 真实物理宽度（毫米）与物理分辨率，以主屏像素密度（`px/cm`）为 `1.000x` 基准，自动对副屏施加阻尼/增益补偿，使手指在妙控板上滑动 1cm 在不同尺寸/分辨率屏幕上的物理移动厘米数完全一致。
-   - **类 macOS S型动态加速曲线（慢滑稳、快甩飞）**：仅在单指移动（`contactCount == 1`）时根据手指物理滑动速率 $v$（`units/ms`）按平滑 S 曲线 $G(v) = 0.95 + (3.40 - 0.95) \cdot \frac{(v/4.5)^{1.85}}{1+(v/4.5)^{1.85}}$ 动态注入加速位移（带亚像素余数累积），慢滑微操 `0.95x` 精准不发飘，中常速 `1.4x~2.2x` 轻快跟手，快甩最高 `3.40x` 轻松横跨多联屏；双指滚动与三/四指手势完全不受影响。
-   - **二段深压预览**：普通点击峰值约 `65~115`，单指重压达到阈值（默认 `180`，支持 `120~250` 自定义）且未发生大幅拖拽位移时，在桌面 / 资源管理器 / QuickLook 窗口自动释放左键并通过命名管道秒调 **QuickLook** 预览文件（自带 20 个插件目录、21 个完整预览插件 DLL）。
+从 [Releases](https://github.com/CNDDVP/apple-magic-trackpad-windows/releases) 下载更新包，解压后在当前登录用户的PowerShell执行：
 
-4. **全自动自愈计划任务 (`\MagicTrackpad_AutoFix`)**
-   - 自动注册三大触发器：**用户登录时**、**每 15 分钟定期巡检**、**系统睡眠唤醒事件 (`Power-Troubleshooter EventID=1`)**。
-   - 自动关闭 Apple 触控板节点 Windows 节能断连项（`EnhancedPowerManagementEnabled = 0`、`SelectiveSuspendEnabled = 0`），自动修复 USB `MI_00` `Code 10` 异常节点，并通过底层 IOCTL (`0x00222000`) / 命名管道热重载驱动参数。
-
----
-
-## 快速开始（一键安装）
-
-### 环境要求
-- **操作系统**：Windows 11 24H2 (Build 26100) 或更新版本（64 位）
-- **硬件支持**：Apple Magic Trackpad 2 / 3（支持 USB-C `VID_05AC&PID_0324` 与 Lightning `VID_05AC&PID_0265`，蓝牙或有线连接均可）
-
-### 安装步骤
-
-1. **克隆或下载本仓库**：
-   ```powershell
-   git clone https://github.com/<your-username>/apple-magic-trackpad-windows.git
-   cd apple-magic-trackpad-windows
-   ```
-2. **一键部署**：
-   - 直接右键 **`一键配置妙控板(管理员运行).cmd`** -> **以管理员身份运行**；
-   - 或在**当前登录用户的 64 位管理员 PowerShell** 中执行：
-     ```powershell
-     powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Install_All_MagicTrackpad.ps1
-     ```
-   - **可选参数**：
-     ```powershell
-     # 自定义指针速度(1~20)、深压阈值(120~250)或额外安装三指拖拽 MSIX 应用
-     .\Install_All_MagicTrackpad.ps1 -CursorSpeed 14 -ForceClickThreshold 180 -EnableThreeFingerDrag
-     ```
-
-> **说明**：为兼容 GitHub 单文件 100MB 限制，仓库中的便携版 `QuickLook_Portable_Clean.zip`（含完整 21 个预览插件）已切分为 `.part1` + `.part2`。运行 `Install_All_MagicTrackpad.ps1` 时，脚本会自动在 `[0/7]` 阶段将其流式无损合并为 `QuickLook_Portable_Clean.zip` 并执行全量 SHA256 校验，无需手动解压或安装 Git LFS。
-
----
-
-## 给 AI 助手的一键配置 Prompt
-
-如果你在新电脑上使用 AI Agent（如 Hermes / Claude Code / OpenClaw / Cursor），可直接发送以下指令让 AI 完成全套安装与核验：
-
-```text
-请读取仓库中的 README_AI配置指南.md。
-先核对 Windows 版本、系统架构、妙控板型号和蓝牙适配器驱动，使用当前已登录用户的管理员权限运行 Install_All_MagicTrackpad.ps1；不要切换到另一个管理员账户。
-默认：光标速度14、轻点点击开、轻点两下拖拽关、双指滚动与缩放开、IgnoreButtonFinger=0同时写入USB和蓝牙分支；保留三/四指手势映射。
-原生参数必须通过 SPI_GET/SETTOUCHPADPARAMETERS 读取、修改、回读。TapAndDrag 是 userFlags 的 0x08 位，双指滚动是0x80位，缩放是0x100位（447清除0x08后为439）。
-安装后核对驱动、任务触发器、自启项、预览程序、AutoFix日志与Install.result.json。
+```powershell
+.\Update_MagicForceClick.ps1
+# 也可显式指定正在使用的程序目录
+.\Update_MagicForceClick.ps1 -RuntimeDir 'C:\实际目录\MagicTrackpad'
 ```
 
----
+更新器从当前用户启动项识别现有路径，先校验配置、备份、停止并释放旧进程，再切换文件。现有JSON设置保留。新建启动项不再携带固定180参数，因此设置面板中的压力阈值可以生效；旧版位置参数仍兼容。
 
-## 常用独立维护命令
+**此工具升级不安装驱动，不改Windows速度、蓝牙配对、QuickLook或维护任务。** 安装失败会自动还原本次快照内的文件与启动项。
 
-- **仅读取并核验当前触控板 API 与注册表状态（不修改）**：
-  ```powershell
-  powershell.exe -ExecutionPolicy Bypass -File .\Set_MagicTrackpad_UserSettings.ps1 -ReadOnly
-  ```
-- **单独调整指针速度并同步 API 与注册表（例如设为 14）**：
-  ```powershell
-  powershell.exe -ExecutionPolicy Bypass -File .\Set_MagicTrackpad_UserSettings.ps1 -CursorSpeed 14
-  ```
-- **手动触发一次驱动电源与参数自愈重载**：
-  ```powershell
-  schtasks /run /tn "\MagicTrackpad_AutoFix"
-  ```
+设置入口：双击运行目录的 `Open_MagicTrackpad_Settings.cmd`，或运行 `MagicForceClick.exe --settings`。
 
----
+## 回退到升级前版本
 
-## 仓库目录结构
+升级器输出 `SnapshotDir`，其中包含文件的原有/不存在状态、SHA256、原启动项和独立恢复脚本。请保留整个 `rollback-snapshots` 文件夹。
 
-| 文件 / 目录 | 说明 |
-| --- | --- |
-| `一键配置妙控板(管理员运行).cmd` | 管理员权限自提权一键安装入口 |
-| `Install_All_MagicTrackpad.ps1` | 主安装脚本（分卷自动合并、SHA256 校验、自动备份、驱动安装、API 同步、QuickLook 部署、自启与计划任务注册） |
-| `Set_MagicTrackpad_UserSettings.ps1` | Windows 11 原生 `SystemParametersInfoW` (`0x00AE`/`0x00AF`) 触控板参数与注册表双写同步脚本 |
-| `MagicTrackpad_AutoFix.ps1` / `.vbs` | 后台自愈脚本与静默启动器（电源防断连、USB/蓝牙 `IgnoreButtonFinger=0` 守护、驱动 IOCTL/Pipe 热重载） |
-| `Register_MagicTrackpad_AutoFix.ps1` | 注册 `\MagicTrackpad_AutoFix` 计划任务（登录 + 15 分钟周期 + 睡眠唤醒事件三触发器） |
-| `MagicForceClick.cs` / `.exe` | 二段深压（Force Click）RawInput 守护进程源码与可执行文件（联动 QuickLook 预览） |
-| `AmtPtpControlPanel.exe` | 驱动按压力度与触觉反馈控制面板 |
-| `AMD64/`、`ARM64/` | Apple Precision Touchpad 微软签名驱动（v2.2，`2026.3982.1.1000`） |
-| `QuickLook_Portable_Clean.zip.part1` / `.part2` | 去重清理后的 QuickLook 便携包分卷（含 20 个插件目录、21 个插件 DLL，安装时自动合并校验） |
-| `ThreeFingersDragOnWindows_2.0.7_x64.Msix` | 可选的 Windows 三指拖拽增强工具包（通过 `-EnableThreeFingerDrag` 按需安装） |
-| `Realtek_Bluetooth_Backup/` | RTL8851BU (`USB\VID_0BDA&PID_B851&MI_00`) 蓝牙适配器驱动离线备份（仅特定硬件按需手动恢复，主脚本不自动安装） |
-| `README_AI配置指南.md` | 面向 AI Agent 与深入排障的技术规范、位掩码说明与回退指南 |
-| `SHA256SUMS.json` | 全量文件 SHA256 校验清单 |
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File '实际SnapshotDir\Restore_MagicForceClick.ps1' -SnapshotDir '实际SnapshotDir'
+```
 
----
+恢复先检查备份哈希和路径，再停止程序、还原原文件、移除本次新增文件、恢复启动项，必要时重启原程序。可重复执行。不要用 `-DoNotStart`，除非希望恢复后保持关闭。
 
-## 致谢与声明
+此次发布的基线是提交 [`2594280`](https://github.com/CNDDVP/apple-magic-trackpad-windows/commit/2594280052ed327c5a328f9b0e3d38f2ec7545ce)。Release另附该提交的原程序和源码；本地升级快照用于恢复个人配置。恢复脚本不能恢复被外部删除/损坏的备份，也不撤销用户之后另行安装的驱动或修改。
 
-- 触控板底层驱动基于开源项目 [imbushuo/mac-precision-touchpad](https://github.com/imbushuo/mac-precision-touchpad) 及其签名发行版（Bingxing Wang, Vito Plantamura）。
-- 文件预览基于开源项目 [QL-Win/QuickLook](https://github.com/QL-Win/QuickLook)，可选三指拖拽包来自 [ClementGre/ThreeFingersDragOnWindows](https://github.com/ClementGre/ThreeFingersDragOnWindows)。
-- 本仓库中的自动化配置、原生 API 同步、自愈守护脚本与 `MagicForceClick` 源码采用 [MIT License](LICENSE) 开源。
+## 新电脑完整安装
+
+Windows 11 24H2 / Build 26100+，64位PowerShell；使用当前交互用户的管理员权限，不要切换到另一个管理员账户。
+
+```powershell
+git clone https://github.com/CNDDVP/apple-magic-trackpad-windows.git
+cd apple-magic-trackpad-windows
+.\Install_All_MagicTrackpad.ps1 -CursorSpeed 14 -ForceClickThreshold 180
+```
+
+主脚本合并两个QuickLook分卷并验证SHA256，安装对应架构的Apple驱动，配置USB/蓝牙两分支、原生触控板参数、QuickLook、自启和维护任务。驱动安装可能需要重连或重启；首次蓝牙配对仍需手动完成。
+
+`Realtek_Bluetooth_Backup` 仅对应本机RTL8851BU `USB\VID_0BDA&PID_B851&MI_00`，不会自动安装到其他电脑。可选三指拖拽应用需额外配置；三/四指滑动手势映射由系统保留。
+
+## 配置与自测
+
+- `MagicForceClick.json`：版本化配置。`EnableForceClick` / `EnableAcceleration` / `EnableMonitorCompensation` 为独立开关，`AccelerateWhilePressed` 可关闭按住时的额外S型加速。
+- `MagicForceClick.status.json`：当前生效设置、RawInput注册、有效/重复扫描帧和计时重置统计。它是诊断状态，不作为设备实际手势正常的唯一证据。
+- `MagicForceClick.Core.cs`：可离线测试的扫描时间、曲线、按压状态机；`MagicForceClick.Settings.cs`：设置窗口。
+- `Build.ps1`：用.NET Framework编译器构建程序并运行39项行为测试、4项配置/界面集成测试。`tests/Test-UpdateRollback.ps1`另验证更新与回退；真实程序已运行时还测试启动失败自动恢复，总计5项。
+- `.github/workflows/build.yml`：Windows构建和行为/集成测试。
+- `SHA256SUMS.json`：自动生成的发布文件大小与SHA256；不包含自身、构建缓存或个人回退快照。
+
+```powershell
+.\Build.ps1
+```
+
+测试覆盖计时回绕、蓝牙式批量到达、重复/旧帧、松手与重连、普通/深按、低压力开始拖动、多指取消、配置热加载、无效配置保护、文件校验与失败恢复。实际蓝牙/USB输入、睡眠恢复和不同使用者的压力手感仍需实机验收，测试不会伪称提供第二次震动。
+
+## 依赖与许可
+
+签名驱动来自 [mac-precision-touchpad](https://github.com/imbushuo/mac-precision-touchpad) 的发行版（Bingxing Wang、Vito Plantamura）；预览依赖 [QuickLook](https://github.com/QL-Win/QuickLook)。本项目工具源码采用MIT许可；打包依赖保留各自许可。

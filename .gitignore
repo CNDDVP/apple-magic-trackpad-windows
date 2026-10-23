@@ -10,3 +10,9 @@ QuickLook_Portable_Clean.zip
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# Local build and rollback state
+artifacts/
+*.status.json
+*.tmp
+rollback-snapshots/
