@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
@@ -21,9 +22,43 @@ namespace MagicForceClick
         private const int STAGE2_RESET_THRESHOLD = 110;
         private const int MAX_DRAG_DELTA = 220; // 若手指已明显滑动拖拽窗口，则不误触二段预览
 
+        [DllImport("user32.dll")]
+        private static extern bool SetProcessDpiAwarenessContext(IntPtr dpiContext);
+
+        [DllImport("shcore.dll")]
+        private static extern int SetProcessDpiAwareness(int value);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetProcessDPIAware();
+
+        private static void EnablePerMonitorDpiAwareness()
+        {
+            try
+            {
+                // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4
+                if (SetProcessDpiAwarenessContext(new IntPtr(-4)))
+                    return;
+            }
+            catch { }
+            try
+            {
+                // PROCESS_PER_MONITOR_DPI_AWARE = 2
+                if (SetProcessDpiAwareness(2) == 0)
+                    return;
+            }
+            catch { }
+            try
+            {
+                SetProcessDPIAware();
+            }
+            catch { }
+        }
+
         [STAThread]
         static void Main(string[] args)
         {
+            EnablePerMonitorDpiAwareness();
+
             bool createdNew;
             using (var mutex = new Mutex(true, "Global\\MagicTrackpad2_ForceClick_Daemon", out createdNew))
             {
@@ -47,6 +82,7 @@ namespace MagicForceClick
     internal sealed class RawInputSinkForm : Form
     {
         private const int WM_INPUT = 0x00FF;
+        private const int WM_DISPLAYCHANGE = 0x007E;
         private const uint RID_INPUT = 0x10000003;
         private const uint RIM_TYPEHID = 2;
         private const uint RIDEV_INPUTSINK = 0x00000100;
@@ -61,6 +97,36 @@ namespace MagicForceClick
         private bool _loggedReport;
         private bool _diagnosticButtonDown;
         private int _diagnosticPeak;
+
+        // === 多屏 PPI 自动等速补偿 + 类 macOS S型动态加速曲线 状态 ===
+        private struct MonitorScaleInfo
+        {
+            public string DeviceName;
+            public int Left, Top, Right, Bottom;
+            public int PhysWidthPx, PhysHeightPx;
+            public double PhysWidthCm;
+            public double PpiPxPerCm;
+            public double ScaleFactor;
+        }
+
+        private MonitorScaleInfo[] _monitors = new MonitorScaleInfo[0];
+
+        // S型加速曲线参数（针对妙控板 ~46 units/mm 硬件分辨率调优 - 提速版）
+        // v 单位：HID units / ms（1 unit/ms ≈ 2.17 cm/s）
+        private double _curveMinGain = 0.95;   // 极慢速微操保持接近 1:1 精准度，不发飘也不拖泥带水
+        private double _curveMaxGain = 3.40;   // 快速甩动跨屏最大增益（一指轻甩即可横跨 8320px 三联屏）
+        private double _curveMidSpeed = 4.5;   // S曲线拐点速度前移（units/ms），中常速移动即明显提速
+        private double _curvePower = 1.85;     // S曲线指数，提速介入更早更顺滑
+
+        private bool _wasSingleFinger;
+        private uint _prevContactId;
+        private int _prevPadX;
+        private int _prevPadY;
+        private long _prevTimestamp;
+        private double _smoothedSpeed;
+        private POINT _lastSetPos;
+        private double _remX;
+        private double _remY;
 
         private static void Log(string message)
         {
@@ -96,6 +162,123 @@ namespace MagicForceClick
             dev[0].hwndTarget = Handle;
             bool registered = RegisterRawInputDevices(dev, 1, (uint)Marshal.SizeOf(typeof(RAWINPUTDEVICE)));
             Log("RawInput registration=" + registered + "; error=" + (registered ? 0 : Marshal.GetLastWin32Error()) + "; threshold=" + _threshold);
+            RefreshMonitors();
+        }
+
+        private void RefreshMonitors()
+        {
+            try
+            {
+                Screen[] screens = Screen.AllScreens;
+                List<MonitorScaleInfo> list = new List<MonitorScaleInfo>();
+                double primaryPpi = 0;
+
+                foreach (Screen scr in screens)
+                {
+                    DEVMODE dm = new DEVMODE();
+                    dm.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
+                    int left = scr.Bounds.Left;
+                    int top = scr.Bounds.Top;
+                    int physW = scr.Bounds.Width;
+                    int physH = scr.Bounds.Height;
+                    if (EnumDisplaySettings(scr.DeviceName, -1, ref dm) && dm.dmPelsWidth > 0)
+                    {
+                        left = dm.dmPositionX;
+                        top = dm.dmPositionY;
+                        physW = dm.dmPelsWidth;
+                        physH = dm.dmPelsHeight;
+                    }
+
+                    // 直接通过 GDI GetDeviceCaps(HORZSIZE=4) 从显示器 EDID 读取真实物理宽度（mm -> cm），支持任意新电脑多屏自适应
+                    double widthCm = (physW >= 3400) ? 71.0 : 53.0;
+                    IntPtr hdc = CreateDC(null, scr.DeviceName, null, IntPtr.Zero);
+                    if (hdc != IntPtr.Zero)
+                    {
+                        try
+                        {
+                            int horzMm = GetDeviceCaps(hdc, 4); // HORZSIZE (mm)
+                            if (horzMm >= 150 && horzMm <= 2000)
+                                widthCm = horzMm / 10.0;
+                        }
+                        finally
+                        {
+                            DeleteDC(hdc);
+                        }
+                    }
+                    double ppi = physW / widthCm;
+
+                    MonitorScaleInfo info = new MonitorScaleInfo();
+                    info.DeviceName = scr.DeviceName;
+                    info.Left = left;
+                    info.Top = top;
+                    info.Right = left + physW;
+                    info.Bottom = top + physH;
+                    info.PhysWidthPx = physW;
+                    info.PhysHeightPx = physH;
+                    info.PhysWidthCm = widthCm;
+                    info.PpiPxPerCm = ppi;
+                    info.ScaleFactor = 1.0;
+
+                    if (scr.Primary || primaryPpi <= 0)
+                        primaryPpi = ppi;
+
+                    list.Add(info);
+                }
+
+                if (primaryPpi <= 0)
+                    primaryPpi = 54.08;
+
+                for (int i = 0; i < list.Count; i++)
+                {
+                    MonitorScaleInfo m = list[i];
+                    m.ScaleFactor = m.PpiPxPerCm / primaryPpi;
+                    if (m.ScaleFactor < 0.40) m.ScaleFactor = 0.40;
+                    if (m.ScaleFactor > 1.60) m.ScaleFactor = 1.60;
+                    list[i] = m;
+                    Log(string.Format("Monitor {0}: PhysBounds=({1},{2})-({3},{4}) Phys={5}x{6} WidthCm={7:F1} PPI={8:F2}px/cm ScaleFactor={9:F3}x",
+                        m.DeviceName, m.Left, m.Top, m.Right, m.Bottom, m.PhysWidthPx, m.PhysHeightPx, m.PhysWidthCm, m.PpiPxPerCm, m.ScaleFactor));
+                }
+
+                _monitors = list.ToArray();
+            }
+            catch (Exception ex)
+            {
+                Log("RefreshMonitors error: " + ex.Message);
+            }
+        }
+
+        private double GetMonitorScaleAt(int x, int y)
+        {
+            MonitorScaleInfo[] mons = _monitors;
+            for (int i = 0; i < mons.Length; i++)
+            {
+                if (x >= mons[i].Left && x < mons[i].Right && y >= mons[i].Top && y < mons[i].Bottom)
+                    return mons[i].ScaleFactor;
+            }
+            double bestDist = double.MaxValue;
+            double bestScale = 1.0;
+            for (int i = 0; i < mons.Length; i++)
+            {
+                int cx = (mons[i].Left + mons[i].Right) / 2;
+                int cy = (mons[i].Top + mons[i].Bottom) / 2;
+                double d = (double)(x - cx) * (x - cx) + (double)(y - cy) * (y - cy);
+                if (d < bestDist)
+                {
+                    bestDist = d;
+                    bestScale = mons[i].ScaleFactor;
+                }
+            }
+            return bestScale;
+        }
+
+        private double ComputeMacSCurveGain(double speedUnitsPerMs)
+        {
+            if (speedUnitsPerMs <= 0.001)
+                return _curveMinGain;
+            double ratio = speedUnitsPerMs / _curveMidSpeed;
+            double pow = Math.Pow(ratio, _curvePower);
+            double s = pow / (1.0 + pow);
+            return _curveMinGain + (_curveMaxGain - _curveMinGain) * s;
         }
 
         protected override void SetVisibleCore(bool value)
@@ -111,6 +294,10 @@ namespace MagicForceClick
             if (m.Msg == WM_INPUT)
             {
                 ProcessRawInput(m.LParam);
+            }
+            else if (m.Msg == WM_DISPLAYCHANGE)
+            {
+                RefreshMonitors();
             }
             base.WndProc(ref m);
         }
@@ -163,6 +350,9 @@ namespace MagicForceClick
             if (r.Length < 112 || r[0] != 0x05)
                 return;
 
+            byte c0Flags = r[1];
+            bool tipSwitch = (c0Flags & 0x02) != 0;
+            uint c0Id = BitConverter.ToUInt32(r, 2);
             byte contactCount = r[108];
             ushort c0X = (ushort)(r[6] | (r[7] << 8));
             ushort c0Y = (ushort)(r[8] | (r[9] << 8));
@@ -170,6 +360,80 @@ namespace MagicForceClick
             ushort mechForce = (ushort)(r[109] | (r[110] << 8));
             byte isButtonClicked = r[111];
 
+            // === 1. 单指移动：三屏 PPI 等速补偿 + 类 macOS S型动态加速曲线 ===
+            if (contactCount == 1 && tipSwitch)
+            {
+                long nowTicks = Stopwatch.GetTimestamp();
+                POINT curPos;
+                GetCursorPos(out curPos);
+
+                if (_wasSingleFinger && c0Id == _prevContactId)
+                {
+                    double dtMs = (nowTicks - _prevTimestamp) * 1000.0 / Stopwatch.Frequency;
+                    if (dtMs >= 0.5 && dtMs <= 65.0)
+                    {
+                        int dPadX = (int)c0X - _prevPadX;
+                        int dPadY = (int)c0Y - _prevPadY;
+                        double padDist = Math.Sqrt((double)dPadX * dPadX + (double)dPadY * dPadY);
+                        double instSpeed = padDist / dtMs; // HID units / ms
+                        _smoothedSpeed = 0.55 * instSpeed + 0.45 * _smoothedSpeed;
+
+                        int winDx = curPos.X - _lastSetPos.X;
+                        int winDy = curPos.Y - _lastSetPos.Y;
+
+                        if ((winDx != 0 || winDy != 0) && Math.Abs(winDx) < 800 && Math.Abs(winDy) < 800)
+                        {
+                            double monScale = GetMonitorScaleAt(curPos.X, curPos.Y);
+                            double curveGain = ComputeMacSCurveGain(_smoothedSpeed);
+                            double totalScale = monScale * curveGain;
+
+                            double targetDx = winDx * totalScale + _remX;
+                            double targetDy = winDy * totalScale + _remY;
+                            int applyDx = (int)Math.Round(targetDx);
+                            int applyDy = (int)Math.Round(targetDy);
+                            _remX = targetDx - applyDx;
+                            _remY = targetDy - applyDy;
+
+                            int newX = _lastSetPos.X + applyDx;
+                            int newY = _lastSetPos.Y + applyDy;
+
+                            if (newX != curPos.X || newY != curPos.Y)
+                            {
+                                SetCursorPos(newX, newY);
+                                GetCursorPos(out curPos);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        _smoothedSpeed = 0;
+                        _remX = 0;
+                        _remY = 0;
+                    }
+                }
+                else
+                {
+                    _smoothedSpeed = 0;
+                    _remX = 0;
+                    _remY = 0;
+                }
+
+                _wasSingleFinger = true;
+                _prevContactId = c0Id;
+                _prevPadX = c0X;
+                _prevPadY = c0Y;
+                _prevTimestamp = nowTicks;
+                _lastSetPos = curPos;
+            }
+            else
+            {
+                _wasSingleFinger = false;
+                _smoothedSpeed = 0;
+                _remX = 0;
+                _remY = 0;
+            }
+
+            // === 2. 二段式重压预览（Force Click） ===
             int pressure = Math.Max((int)c0Pressure, (int)mechForce);
             bool diagnosticDown = (isButtonClicked & 1) != 0;
             if (diagnosticDown && !_diagnosticButtonDown)
@@ -347,6 +611,40 @@ namespace MagicForceClick
             public IntPtr wParam;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int X;
+            public int Y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct DEVMODE
+        {
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)] public char[] dmDeviceName;
+            public short dmSpecVersion;
+            public short dmDriverVersion;
+            public short dmSize;
+            public short dmDriverExtra;
+            public int dmFields;
+            public int dmPositionX;
+            public int dmPositionY;
+            public int dmDisplayOrientation;
+            public int dmDisplayFixedOutput;
+            public short dmColor;
+            public short dmDuplex;
+            public short dmYResolution;
+            public short dmTTOption;
+            public short dmCollate;
+            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)] public char[] dmFormName;
+            public short dmLogPixels;
+            public int dmBitsPerPel;
+            public int dmPelsWidth;
+            public int dmPelsHeight;
+            public int dmDisplayFlags;
+            public int dmDisplayFrequency;
+        }
+
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool RegisterRawInputDevices(RAWINPUTDEVICE[] pRawInputDevices, uint uiNumDevices, uint cbSize);
 
@@ -355,6 +653,24 @@ namespace MagicForceClick
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        private static extern bool GetCursorPos(out POINT lpPoint);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetCursorPos(int X, int Y);
+
+        [DllImport("user32.dll")]
+        private static extern bool EnumDisplaySettings(string lpszDeviceName, int iModeNum, ref DEVMODE lpDevMode);
+
+        [DllImport("gdi32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr CreateDC(string lpszDriver, string lpszDevice, string lpszOutput, IntPtr lpInitData);
+
+        [DllImport("gdi32.dll")]
+        private static extern bool DeleteDC(IntPtr hdc);
+
+        [DllImport("gdi32.dll")]
+        private static extern int GetDeviceCaps(IntPtr hdc, int nIndex);
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
