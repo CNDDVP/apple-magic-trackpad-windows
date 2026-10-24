@@ -5,9 +5,20 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Compile and test
         shell: powershell
         run: .\Build.ps1
+      - name: Compile control center and test configuration behavior
+        shell: powershell
+        run: .\Build-ControlCenter.ps1 -OutputDir artifacts/control-center
+      - name: Test suite upgrade and rollback
+        shell: powershell
+        run: |
+          .\tests\Test-SuiteUpgrade.ps1 | Tee-Object artifacts/SuiteUpgradeResults.txt
+          python -c "import pathlib,subprocess; p=pathlib.Path('artifacts/baseline'); p.mkdir(exist_ok=True); (p/'MagicForceClick.exe').write_bytes(subprocess.check_output(['git','show','fc364b2d53f9a177f2e366ab8d639506298cb283:MagicForceClick.exe']))"
+          .\tests\Test-UpdateRollback.ps1 | Tee-Object artifacts/UpdateRollbackResults.txt
       - uses: actions/upload-artifact@v4
         with:
           name: MagicForceClick-tested-build

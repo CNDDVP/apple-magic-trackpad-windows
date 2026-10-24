@@ -15,18 +15,18 @@
 </div>
 
 <p align="center">
-  <a href="https://github.com/CNDDVP/apple-magic-trackpad-windows/releases"><img src="https://img.shields.io/badge/Suite-v1.1.1-008a64?style=flat" alt="Suite v1.1.1"/></a>
+  <a href="https://github.com/CNDDVP/apple-magic-trackpad-windows/releases"><img src="https://img.shields.io/badge/Suite-v1.2.0-008a64?style=flat" alt="Suite v1.2.0"/></a>
   <a href="https://github.com/CNDDVP/apple-magic-trackpad-windows/actions/workflows/build.yml"><img src="https://github.com/CNDDVP/apple-magic-trackpad-windows/actions/workflows/build.yml/badge.svg" alt="Build and behavior tests"/></a>
   <a href="https://github.com/CNDDVP/apple-magic-trackpad-windows/actions/workflows/release.yml"><img src="https://github.com/CNDDVP/apple-magic-trackpad-windows/actions/workflows/release.yml/badge.svg" alt="Package release assets"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat" alt="License: MIT"/></a>
   <img src="https://img.shields.io/badge/Windows_11-24H2%2B_(Build_26100%2B)-0078D4?style=flat&logo=windows11&logoColor=white" alt="Windows 11 24H2+"/>
   <img src="https://img.shields.io/badge/Arch-AMD64_%7C_ARM64-4d6b60?style=flat" alt="AMD64 | ARM64"/>
-  <a href="TEST_REPORT_v1.1.1.md"><img src="https://img.shields.io/badge/Tests-69_Passed-16a34a?style=flat" alt="Tests: 69 Passed"/></a>
+  <a href="TEST_REPORT_v1.2.0.md"><img src="https://img.shields.io/badge/Tests-Verified-16a34a?style=flat" alt="Tests: verified"/></a>
 </p>
 
 <p align="center">
   <b>让 Apple 妙控板在 Windows 11 上拥有原生手势、硬件时钟级 S 型加速与防误触深按预览。</b><br/>
-  底层签名驱动仍为发行包 v2.2 / INF <code>2026.3982.1.1000</code>；本页的 <b>1.1.1 是工具套件版本</b>。
+  底层签名驱动仍为发行包 v2.2 / INF <code>2026.3982.1.1000</code>；本页的 <b>1.2.0 是工具套件版本</b>，增强后台保留已验证的 v1.1.1。
 </p>
 
 在 Windows 11 上运行一行安装或热升级脚本，即可为 **Apple USB-C / Lightning 妙控板（Magic Trackpad）** 配置 WHQL/目录签名驱动、USB 与蓝牙双分支参数、**100µs 硬件扫描时钟 S 型加速**、**跨屏像素中心补偿**，以及支持 **文件资源管理器 / 桌面（QuickLook）** 与 **Directory Opus 13** 的 **Force Click 深按文件预览**。
@@ -44,7 +44,7 @@
 
 ### 场景 A：这台电脑已配置过驱动 —— 仅升级工具（推荐）
 
-从 [Releases](https://github.com/CNDDVP/apple-magic-trackpad-windows/releases) 下载 `MagicForceClick-v1.1.1-update.zip`，解压后在**当前登录用户**的 PowerShell 中执行：
+从 [Releases](https://github.com/CNDDVP/apple-magic-trackpad-windows/releases) 下载 `MagicForceClick-v1.2.0-update.zip`，解压后在**当前登录用户**的 PowerShell 中执行：
 
 ```powershell
 .\Update_MagicForceClick.ps1
@@ -52,7 +52,7 @@
 .\Update_MagicForceClick.ps1 -RuntimeDir 'C:\实际目录\MagicTrackpad'
 ```
 
-更新器自动从当前用户启动项识别运行目录，先校验配置、生成快照备份、停止旧进程，再原子切换文件并保留现有 `MagicForceClick.json` 个人设置。
+更新器自动从当前用户启动项识别运行目录，先校验配置并生成快照备份，再更新后台、控制中心和入口；后台字节相同时保留现有进程并保留现有 `MagicForceClick.json` 个人设置。
 
 ### 场景 B：新电脑 —— 完整安装驱动与套件
 
@@ -76,11 +76,25 @@ cd apple-magic-trackpad-windows
 ├── MagicForceClick.exe              # 后台常驻程序（支持 --settings 打开图形设置面板）
 ├── MagicForceClick.json             # 个人手感与开关配置（升级自动保留，保存后约 1 秒热加载）
 ├── MagicForceClick.status.json      # 实时运行诊断（RawInput 状态、有效/重复帧、重置与发送统计）
+├── MagicControlCenter\MagicControlCenter.exe # 五页控制中心（含独立 DPI 配置）
+├── Open_MagicTrackpad_ControlCenter.cmd # 打开控制中心
 ├── Open_MagicTrackpad_Settings.cmd  # 双击直接打开手感与深按设置窗口
 └── rollback-snapshots\              # 每次升级自动生成的字节级备份快照与独立 Restore 脚本
 ```
 
 ---
+
+## 可视化控制中心（v1.2.0）
+
+<p align="center"><img src="docs/assets/control-center.png" alt="Magic Trackpad 控制中心指针手感页" width="920"></p>
+
+五页原生 Windows 界面统一管理指针曲线、深按预览、原生手势和后台诊断。安装或升级后，双击桌面“妙控板控制中心”，也可运行：
+
+```powershell
+.\Open_MagicTrackpad_ControlCenter.cmd
+```
+
+个人配置仍在上级运行目录的 `MagicForceClick.json`。保存前备份，保留高级及未知字段；检测其他窗口修改，并根据新鲜后台状态确认生效。截图来自隔离验收。详见[控制中心说明](MAGIC_CONTROL_CENTER.md)、[v1.2.0 更新说明](RELEASE_NOTES_v1.2.0.md)和[验证范围](TEST_REPORT_v1.2.0.md)。
 
 ## 工作流与实时状态 (See it in action)
 

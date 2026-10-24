@@ -15,18 +15,18 @@
 </div>
 
 <p align="center">
-  <a href="https://github.com/CNDDVP/apple-magic-trackpad-windows/releases"><img src="https://img.shields.io/badge/Suite-v1.1.1-008a64?style=flat" alt="Suite v1.1.1"/></a>
+  <a href="https://github.com/CNDDVP/apple-magic-trackpad-windows/releases"><img src="https://img.shields.io/badge/Suite-v1.2.0-008a64?style=flat" alt="Suite v1.2.0"/></a>
   <a href="https://github.com/CNDDVP/apple-magic-trackpad-windows/actions/workflows/build.yml"><img src="https://github.com/CNDDVP/apple-magic-trackpad-windows/actions/workflows/build.yml/badge.svg" alt="Build and behavior tests"/></a>
   <a href="https://github.com/CNDDVP/apple-magic-trackpad-windows/actions/workflows/release.yml"><img src="https://github.com/CNDDVP/apple-magic-trackpad-windows/actions/workflows/release.yml/badge.svg" alt="Package release assets"/></a>
   <a href="../LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=flat" alt="License: MIT"/></a>
   <img src="https://img.shields.io/badge/Windows_11-24H2%2B_(Build_26100%2B)-0078D4?style=flat&logo=windows11&logoColor=white" alt="Windows 11 24H2+"/>
   <img src="https://img.shields.io/badge/Arch-AMD64_%7C_ARM64-4d6b60?style=flat" alt="AMD64 | ARM64"/>
-  <a href="../TEST_REPORT_v1.1.1.md"><img src="https://img.shields.io/badge/Tests-69_Passed-16a34a?style=flat" alt="Tests: 69 Passed"/></a>
+  <a href="../TEST_REPORT_v1.1.1.md"><img src="https://img.shields.io/badge/Tests-Verified-16a34a?style=flat" alt="Tests: verified"/></a>
 </p>
 
 <p align="center">
   <b>Native Precision Touchpad gestures, hardware ScanTime S-curve acceleration, and drag-safe Force Click preview for Apple Magic Trackpad on Windows 11.</b><br/>
-  Bundled signed driver remains v2.2 / INF <code>2026.3982.1.1000</code>; <b>1.1.1 is the user-space tooling suite version</b>.
+  Bundled signed driver remains v2.2 / INF <code>2026.3982.1.1000</code>; <b>1.2.0 is the suite version; the validated v1.1.1 backend is retained</b>.
 </p>
 
 Run a single PowerShell installer or hot-updater to equip your **Apple USB-C / Lightning Magic Trackpad** on Windows 11 with catalog-signed Precision Touchpad drivers, dual USB/Bluetooth registry profiles, **100µs hardware `ScanTime` S-curve pointer acceleration**, **Per-Monitor Virtual Desktop compensation**, and **Force Click file preview** across **File Explorer / Desktop (QuickLook)** and **Directory Opus 13**.
@@ -44,7 +44,7 @@ Run a single PowerShell installer or hot-updater to equip your **Apple USB-C / L
 
 ### Option A: Upgrade tooling on an already-configured PC
 
-Download `MagicForceClick-v1.1.1-update.zip` from [Releases](https://github.com/CNDDVP/apple-magic-trackpad-windows/releases), extract it, and run in the signed-in user's PowerShell:
+Download `MagicForceClick-v1.2.0-update.zip` from [Releases](https://github.com/CNDDVP/apple-magic-trackpad-windows/releases), extract it, and run in the signed-in user's PowerShell:
 
 ```powershell
 .\Update_MagicForceClick.ps1
@@ -144,3 +144,9 @@ To compile from source and run the test suites locally:
 - **Signed Precision Touchpad Driver**: [mac-precision-touchpad](https://github.com/imbushuo/mac-precision-touchpad) (Bingxing Wang, Vito Plantamura).
 - **Quick Preview Integration**: [QuickLook](https://github.com/QL-Win/QuickLook) and [Directory Opus 13](https://www.gpsoft.com.au/).
 - **License**: Tooling source code and scripts are licensed under the **[MIT License](../LICENSE)**; bundled third-party binaries retain their respective licenses.
+
+## Native Control Center in v1.2.0
+
+The full installer and update package now include the five-page Control Center, its DPI configuration, a desktop shortcut and Open_MagicTrackpad_ControlCenter.cmd. It manages pointer curves, pressure preview, native gestures and live diagnostics, with JSON backups and external-edit protection. The validated v1.1.1 backend is retained; 1.2.0 is the suite version. See [Control Center guide](../MAGIC_CONTROL_CENTER.md), [release notes](../RELEASE_NOTES_v1.2.0.md) and [verification scope](../TEST_REPORT_v1.2.0.md).
+
+![Control Center, isolated acceptance capture](assets/control-center.png)

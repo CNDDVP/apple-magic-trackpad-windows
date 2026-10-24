@@ -3,14 +3,12 @@ on:
   push:
     branches: [main]
     paths: [RELEASE_VERSION]
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
         description: Release tag to verify and publish
         required: true
-        default: v1.1.1
+        default: v1.2.0
 permissions:
   contents: read
 jobs:
@@ -36,21 +34,54 @@ jobs:
       - name: Build and run behavior and integration tests
         shell: powershell
         run: .\Build.ps1
+      - name: Compile control center and test configuration behavior
+        shell: powershell
+        run: .\Build-ControlCenter.ps1 -OutputDir artifacts/control-center
+      - name: Test suite upgrade and rollback
+        shell: powershell
+        run: |
+          .\tests\Test-SuiteUpgrade.ps1 | Tee-Object artifacts/SuiteUpgradeResults.txt
+          python -c "import pathlib,subprocess; p=pathlib.Path('artifacts/baseline'); p.mkdir(exist_ok=True); (p/'MagicForceClick.exe').write_bytes(subprocess.check_output(['git','show','fc364b2d53f9a177f2e366ab8d639506298cb283:MagicForceClick.exe']))"
+          .\tests\Test-UpdateRollback.ps1 | Tee-Object artifacts/UpdateRollbackResults.txt
       - name: Verify checksums and build release packages
+        if: success()
         run: python tools/Package_Release.py
-      - name: Publish verified release and upload assets
+      - name: Publish complete release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $assets = Join-Path 'artifacts/release' $env:RELEASE_TAG
           $notes = 'RELEASE_NOTES_' + $env:RELEASE_TAG + '.md'
-          if (-not (Test-Path -LiteralPath $notes)) { throw 'Release notes missing.' }
-          if (-not (Test-Path -LiteralPath (Join-Path $assets ('MagicForceClick-' + $env:RELEASE_TAG + '-update.zip')))) { throw 'Verified update package missing.' }
-          gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY 2>$null
+          $repo = $env:GITHUB_REPOSITORY
+          $existing = gh api "repos/$repo/releases/tags/$env:RELEASE_TAG" 2>$null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title ('Magic Trackpad Windows ' + $env:RELEASE_TAG) --notes-file $notes --latest
-            if ($LASTEXITCODE -ne 0) { throw 'Release creation failed.' }
+            gh release create $env:RELEASE_TAG --repo $repo --target $env:GITHUB_SHA --title ('Magic Trackpad Windows Suite ' + $env:RELEASE_TAG) --notes-file $notes --draft
+            if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }
           }
-          gh release upload $env:RELEASE_TAG "$assets/*" --repo $env:GITHUB_REPOSITORY
-          if ($LASTEXITCODE -ne 0) { throw 'Release upload failed.' }
+          $release = gh api "repos/$repo/releases/tags/$env:RELEASE_TAG" | ConvertFrom-Json
+          foreach ($file in Get-ChildItem -LiteralPath $assets -File) {
+            $previous = @($release.assets | Where-Object name -eq $file.Name)
+            $digest = 'sha256:' + (Get-FileHash -LiteralPath $file.FullName).Hash.ToLowerInvariant()
+            if ($previous.Count) {
+              if ($previous[0].digest -ne $digest) { throw "Published asset differs; refusing overwrite: $($file.Name)" }
+            } else {
+              if (-not $release.draft) { throw 'Incomplete published release; manual review required.' }
+              gh release upload $env:RELEASE_TAG $file.FullName --repo $repo
+              if ($LASTEXITCODE -ne 0) { throw 'Asset upload failed.' }
+            }
+          }
+          $verified = gh api "repos/$repo/releases/tags/$env:RELEASE_TAG" | ConvertFrom-Json
+          foreach ($file in Get-ChildItem -LiteralPath $assets -File) {
+            $asset = @($verified.assets | Where-Object name -eq $file.Name)
+            if ($asset.Count -ne 1 -or $asset[0].digest -ne ('sha256:' + (Get-FileHash -LiteralPath $file.FullName).Hash.ToLowerInvariant())) { throw 'Uploaded asset digest mismatch.' }
+          }
+          if ($verified.draft) {
+            gh release edit $env:RELEASE_TAG --repo $repo --draft=false --latest
+            if ($LASTEXITCODE -ne 0) { throw 'Publishing verified release failed.' }
+          }
+      - name: Retain verified package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: MagicTrackpad-release-packages
+          path: artifacts/release/

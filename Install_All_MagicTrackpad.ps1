@@ -14,6 +14,7 @@ param(
 $ErrorActionPreference='Stop'
 if($LightCrossScreen -and $PSBoundParameters.ContainsKey('ForceClickThreshold')){throw 'Choose either -LightCrossScreen or an explicit -ForceClickThreshold.'}
 $PackageRoot=$PSScriptRoot
+. (Join-Path $PackageRoot 'Suite_Integration.ps1')
 $stamp=Get-Date -Format yyyyMMdd_HHmmss
 $backup=Join-Path $env:LOCALAPPDATA "MagicTrackpad_Backups\$stamp"
 New-Item -ItemType Directory -Path $backup -Force | Out-Null
@@ -37,7 +38,7 @@ try {
    } finally { $outStream.Dispose() }
   }
  }
- $runtimeFiles=@('AmtPtpControlPanel.exe','MagicForceClick.cs','MagicForceClick.Core.cs','MagicForceClick.Settings.cs','MagicForceClick.Preview.cs','MagicForceClick.json','Open_MagicTrackpad_Settings.cmd','Update_MagicForceClick.ps1','Restore_MagicForceClick.ps1','MagicForceClick.exe','MagicTrackpad_AutoFix.ps1','MagicTrackpad_AutoFix_Silent.vbs','Set_MagicTrackpad_UserSettings.ps1','Register_MagicTrackpad_AutoFix.ps1')
+ $runtimeFiles=@(@('AmtPtpControlPanel.exe','MagicTrackpad_AutoFix.ps1','MagicTrackpad_AutoFix_Silent.vbs','Set_MagicTrackpad_UserSettings.ps1','Register_MagicTrackpad_AutoFix.ps1') + @(Get-MagicTrackpadSuiteFiles) | Select-Object -Unique)
  foreach($file in ($runtimeFiles + @('QuickLook_Portable_Clean.zip',"$arch\AmtPtpDevice.inf","$arch\amtptpdevice.cat"))) {
   if(-not(Test-Path -LiteralPath (Join-Path $PackageRoot $file))) {throw "Missing package file: $file"}
  }
@@ -66,6 +67,9 @@ try {
  if(Test-Path -LiteralPath $TargetDir){Copy-Item -LiteralPath $TargetDir -Destination (Join-Path $backup 'PreviousRuntime') -Recurse}
  $oldTask=Get-ScheduledTask -TaskName MagicTrackpad_AutoFix -ErrorAction SilentlyContinue
  if($oldTask){Export-ScheduledTask -TaskName MagicTrackpad_AutoFix | Set-Content -LiteralPath (Join-Path $backup 'PreviousTask.xml') -Encoding Unicode}
+ $shortcutPath=Get-MagicTrackpadShortcutPath
+ if(Test-Path -LiteralPath $shortcutPath){Copy-Item -LiteralPath $shortcutPath -Destination (Join-Path $backup 'DesktopShortcut.Before.lnk')}
+ Close-MagicTrackpadControlCenter $TargetDir
  $exeFile=Join-Path $TargetDir 'MagicForceClick.exe'
  Write-Host '[1/7] Deploy runtime files (existing files backed up).'
  $thisSession=(Get-Process -Id $PID).SessionId
@@ -83,16 +87,10 @@ try {
  foreach($sub in @('AMD64','ARM64')){Copy-Item -LiteralPath (Join-Path $PackageRoot $sub) -Destination $TargetDir -Recurse -Force}
  foreach($file in $runtimeFiles){
   if($file -eq 'MagicForceClick.json' -and (Test-Path -LiteralPath (Join-Path $TargetDir $file))){continue}
+  New-Item -ItemType Directory -Path (Split-Path (Join-Path $TargetDir $file) -Parent) -Force | Out-Null
   Copy-Item -LiteralPath (Join-Path $PackageRoot $file) -Destination (Join-Path $TargetDir $file) -Force
  }
- # Validate optional rebuild in a candidate file before replacing the supplied executable.
- $csc="$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
- if(Test-Path -LiteralPath $csc){
-  $candidate=Join-Path $TargetDir 'MagicForceClick.candidate.exe'
-  & $csc /nologo /target:winexe /platform:anycpu /optimize+ /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Runtime.Serialization.dll "/out:$candidate" (Join-Path $TargetDir 'MagicForceClick.cs') (Join-Path $TargetDir 'MagicForceClick.Core.cs') (Join-Path $TargetDir 'MagicForceClick.Settings.cs') (Join-Path $TargetDir 'MagicForceClick.Preview.cs')
-  if($LASTEXITCODE -ne 0){throw "ForceClick build failed: $LASTEXITCODE"}
-  Move-Item -LiteralPath $candidate -Destination $exeFile -Force
- }
+ # Install the supplied hash-verified binary; developer builds are separate.
  Write-Host '[2/7] Install signed Apple trackpad driver.'
  & pnputil.exe /add-driver (Join-Path $TargetDir "$arch\AmtPtpDevice.inf") /install
  $driverExit=$LASTEXITCODE
@@ -158,6 +156,7 @@ try {
   if(-not($ql -and $fc)){throw 'Preview process startup verification failed.'}
  } finally {Unregister-ScheduledTask -TaskName $launchTask -Confirm:$false -ErrorAction SilentlyContinue}
  if((Get-ItemProperty -LiteralPath $runKey).QuickLook -ne $qlCommand -or (Get-ItemProperty -LiteralPath $runKey).MagicForceClick -ne $forceCommand){throw 'Startup registry verification failed.'}
+ New-MagicTrackpadShortcut $TargetDir
  if($EnableThreeFingerDrag){
   if($arch -ne 'AMD64'){throw 'The bundled optional three-finger app is x64 only.'}
   Add-AppxPackage -Path (Join-Path $PackageRoot 'ThreeFingersDragOnWindows_2.0.7_x64.Msix')

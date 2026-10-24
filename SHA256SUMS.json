@@ -6,13 +6,13 @@
     },
     {
         "Path":  ".github/workflows/build.yml",
-        "Bytes":  374,
-        "SHA256":  "ECAFB23AC9D5110137EADA80DFF08364EBA5E45789C82F5A7B9BF0789A8D5E35"
+        "Bytes":  1101,
+        "SHA256":  "ABCAEB569B4FDD060A3414A5A3CE2D618EF49FB51A1817DDEA83D42FF56E25AE"
     },
     {
         "Path":  ".github/workflows/release.yml",
-        "Bytes":  2348,
-        "SHA256":  "D5B01DF89DDE3C8AE737AC149E67F2029FC0232A16C46E933A3EB0E2F32FD959"
+        "Bytes":  4268,
+        "SHA256":  "01FC297C66247BC8B26D8EC8F354ED4C25D18B1D7EE7F26E5781F72488C99EB0"
     },
     {
         "Path":  ".gitignore",
@@ -85,6 +85,16 @@
         "SHA256":  "79186454866F00211B352FA9FA629CF9894D935ED5CD96AE2ED78479C9F3F36B"
     },
     {
+        "Path":  "ControlCenter_Acceptance.json",
+        "Bytes":  1260,
+        "SHA256":  "255E1DFC95AF12B110A56242AAC1F4950CDEE30D712DF2E7CCCD325270649D25"
+    },
+    {
+        "Path":  "docs/assets/control-center.png",
+        "Bytes":  102205,
+        "SHA256":  "B8FA41F596AEFD9E8179AD87B56E4DC33CC450A2DC67436D9E2AD54235A6C467"
+    },
+    {
         "Path":  "docs/assets/demo-pipeline-dark.svg",
         "Bytes":  6198,
         "SHA256":  "C2DC0758938ADF47C7A9449428D8D02ACCD5EB84ED143D7B613314559DC20B16"
@@ -106,8 +116,8 @@
     },
     {
         "Path":  "docs/README.en.md",
-        "Bytes":  9783,
-        "SHA256":  "44482CF4579DF5E9F7AE96D9EB0C8390131C51436DE3225494D612AEB7DED3D6"
+        "Bytes":  10433,
+        "SHA256":  "220705153559BC3FB0E54B8F6D6D85FCF51DBC16270D7F31DA51B37A35016D09"
     },
     {
         "Path":  "ForceClick修复说明_20261022.txt",
@@ -116,8 +126,8 @@
     },
     {
         "Path":  "Install_All_MagicTrackpad.ps1",
-        "Bytes":  13072,
-        "SHA256":  "519075D6D828C07F980343FB356627362FB6DD52F13BE8E429020FB9D9209C5E"
+        "Bytes":  12630,
+        "SHA256":  "20018F5289248D9530690E0A1039A07A352C4406F43CDA17144D3FDF8A1A6F6E"
     },
     {
         "Path":  "LICENSE",
@@ -160,6 +170,21 @@
         "SHA256":  "38679BBC30FCCA3ED89559F37ADE30249CB7038CAAA54F52A378D557F1199F27"
     },
     {
+        "Path":  "MagicControlCenter/MAGIC_CONTROL_CENTER.md",
+        "Bytes":  4678,
+        "SHA256":  "91D9FF2D1A0554925C82A06DF901B898755ACDA991AAD88ED04A9174996AE163"
+    },
+    {
+        "Path":  "MagicControlCenter/MagicControlCenter.exe",
+        "Bytes":  58880,
+        "SHA256":  "9AF3576FBE558A697159B1E86A213275EDF9CDFB98A8A1ED011454ED19644D60"
+    },
+    {
+        "Path":  "MagicControlCenter/MagicControlCenter.exe.config",
+        "Bytes":  337,
+        "SHA256":  "07B973121E082C41ABCEA860D9DB158CC1A04502AB6483CA929BBD88281EE988"
+    },
+    {
         "Path":  "MagicForceClick.Core.cs",
         "Bytes":  13804,
         "SHA256":  "FA83A9D222078F85DE77E2D05B7FB3EE881E2DC0276CCB72A67688A5601C9324"
@@ -200,6 +225,11 @@
         "SHA256":  "8349738F4C64385859691EF2C16939ECFFD3117E6C1887234C39E2F478E82B87"
     },
     {
+        "Path":  "Open_MagicTrackpad_ControlCenter.cmd",
+        "Bytes":  70,
+        "SHA256":  "AF9D1FEA4F88EF5CB55B08F0A2DD419FC3F1ACC9B7BE14D024FD61EE116D0EEB"
+    },
+    {
         "Path":  "Open_MagicTrackpad_Settings.cmd",
         "Bytes":  59,
         "SHA256":  "22AED6D7EA48ED7E4A58E4A33ED8E70042FA90E7B070FDF217F594F9D33E93B1"
@@ -226,8 +256,8 @@
     },
     {
         "Path":  "README.md",
-        "Bytes":  20989,
-        "SHA256":  "D68FD54C347084A7427154BAFB8E8F6B1D2BA05559AAD9B804F7B7D9CC0430EC"
+        "Bytes":  21992,
+        "SHA256":  "5E663AF9784B84F62501E0BE29615F436D735DC2E704F69B4AB30834B86F90D7"
     },
     {
         "Path":  "Realtek_Bluetooth_Backup/README.md",
@@ -280,9 +310,14 @@
         "SHA256":  "09019B0D26DDABEB940E4A33FCAA496773F45EDE1835C62A8545A3597F17C990"
     },
     {
+        "Path":  "RELEASE_NOTES_v1.2.0.md",
+        "Bytes":  2234,
+        "SHA256":  "CCDEF5ACF163F0D47BC44DD9E8CB31FFB2B901F61EEF8830B01A7B37FB2D9886"
+    },
+    {
         "Path":  "RELEASE_VERSION",
-        "Bytes":  7,
-        "SHA256":  "AAEEBC6AB5B9DD80BCA452EC7A63A7175F6E9CE9B81B34A66C85E94A5E4D38EC"
+        "Bytes":  8,
+        "SHA256":  "CB970A5298CD7334A2C0EC235F73438AAD546613D35E483F191451A24CA805C0"
     },
     {
         "Path":  "Repair_Verification_20261022.json",
@@ -291,13 +326,18 @@
     },
     {
         "Path":  "Restore_MagicForceClick.ps1",
-        "Bytes":  2626,
-        "SHA256":  "D8755AB575F6D18D82B0BF58C2285D54D68A54AFE1B28773F94FD48F2D363F7F"
+        "Bytes":  3601,
+        "SHA256":  "ECA74F91EA1F2CB249E8FF249B5343732243B37673BCC84CE1CCF45C1D207ADD"
     },
     {
         "Path":  "Set_MagicTrackpad_UserSettings.ps1",
         "Bytes":  3335,
         "SHA256":  "AFCE100792803160CEF36BFAA08AEF908B89DDC2FE669931B9178EC7437BE72C"
+    },
+    {
+        "Path":  "Suite_Integration.ps1",
+        "Bytes":  1670,
+        "SHA256":  "53E787BCE9FB49A6AE498632602184A977D0F80C99DB9F8AB5E3906CBE10F516"
     },
     {
         "Path":  "TEST_REPORT_CONTROL_CENTER.md",
@@ -313,6 +353,11 @@
         "Path":  "TEST_REPORT_v1.1.1.md",
         "Bytes":  2636,
         "SHA256":  "5FF81FA01EE27DF8044CBF971C4B96A5C7E3158B0094FCC16BDB1954F910D12B"
+    },
+    {
+        "Path":  "TEST_REPORT_v1.2.0.md",
+        "Bytes":  1785,
+        "SHA256":  "C3C1CA4FB61224E5CC12A511D0C32A965DCA0446CF86E39124C6D75A2D75BD7A"
     },
     {
         "Path":  "tests/MagicControlCenter.LiveTests.cs",
@@ -340,9 +385,14 @@
         "SHA256":  "52367780065956E1EA164E28F2B4E47CED6742C219710F188C6F29A7E12F8574"
     },
     {
+        "Path":  "tests/Test-SuiteUpgrade.ps1",
+        "Bytes":  5262,
+        "SHA256":  "706CA2763A039E766EC293B4CCCCECC3056E30D2310A9D6513C720135C67503E"
+    },
+    {
         "Path":  "tests/Test-UpdateRollback.ps1",
-        "Bytes":  3580,
-        "SHA256":  "3534953334A4AB518CE9429D9D32BEBD1C026B900FC7EE5C7B688EE2170FCEC5"
+        "Bytes":  3637,
+        "SHA256":  "C646D80B46F8B2D3FC69020FB63F66975B57F11844F1EA6353291A753811209F"
     },
     {
         "Path":  "ThreeFingersDragOnWindows_2.0.7_x64.Msix",
@@ -356,8 +406,8 @@
     },
     {
         "Path":  "tools/Package_Release.py",
-        "Bytes":  3679,
-        "SHA256":  "B8FDEE46EDFBF9B5967A30141F2CA75804F04996AF42D2C66081EBFA05532D6A"
+        "Bytes":  4899,
+        "SHA256":  "2EFAB62376245AFFE31E905A0A09AEDB2EAFF15DABA7BA4467C3ED950D6FD23A"
     },
     {
         "Path":  "tools/Restore-ControlCenter.ps1",
@@ -371,7 +421,7 @@
     },
     {
         "Path":  "Update_MagicForceClick.ps1",
-        "Bytes":  4761,
-        "SHA256":  "E086452A3FBAEC3550DAA9DA4725770B731E38149458ECF2A9C5762B66C9FBA1"
+        "Bytes":  7047,
+        "SHA256":  "A98366914299C802083012B9888B2CC2E1371387490899983C52E9DCC862F6BF"
     }
 ]

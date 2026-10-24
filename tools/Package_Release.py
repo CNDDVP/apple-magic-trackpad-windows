@@ -1,18 +1,22 @@
-"""Package verified tracked files, never personal runtime state or credentials."""
+"""Build deterministic Windows-suite packages from tracked, verified files."""
 from pathlib import Path
 import hashlib,json,subprocess,zipfile
-
 ROOT=Path(__file__).resolve().parents[1]
-BASELINE='2594280052ed327c5a328f9b0e3d38f2ec7545ce'
-PREVIOUS='fc364b2d53f9a177f2e366ab8d639506298cb283'
-VERSION=(ROOT/'RELEASE_VERSION').read_text(encoding='ascii').strip().removeprefix('v')
-OUT=ROOT/'artifacts'/'release'/('v'+VERSION)
+VERSION=(ROOT/'RELEASE_VERSION').read_text(encoding='ascii').strip()
+OUT=ROOT/'artifacts'/'release'/VERSION
 OUT.mkdir(parents=True,exist_ok=True)
-def sha(data):return hashlib.sha256(data).hexdigest().upper()
-def file_sha(path):
-    with path.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest().upper()
-names=[n for n in subprocess.check_output(['git','-C',str(ROOT),'ls-files','-z']).decode().split('\0') if n]
-# Installers verify the assembled archive as well as both source parts.
+def digest(path):
+    with path.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest().upper()
+def package(path, entries):
+    with zipfile.ZipFile(path,'w',zipfile.ZIP_DEFLATED) as archive:
+        for name,data in sorted(entries.items()):
+            info=zipfile.ZipInfo(name.replace('\\','/'),(2026,1,1,0,0,0))
+            info.compress_type=zipfile.ZIP_DEFLATED
+            info.external_attr=0o100644<<16
+            archive.writestr(info,data)
+    with zipfile.ZipFile(path) as archive:
+        if archive.testzip():raise RuntimeError('ZIP CRC failed: '+str(path))
+names=[name for name in subprocess.check_output(['git','-C',str(ROOT),'ls-files','-z']).decode().split('\0') if name]
 assembled=ROOT/'QuickLook_Portable_Clean.zip'
 if not assembled.exists():
     with assembled.open('wb') as dst:
@@ -21,26 +25,35 @@ if not assembled.exists():
                 while chunk:=src.read(1024*1024):dst.write(chunk)
 for item in json.loads((ROOT/'SHA256SUMS.json').read_text(encoding='utf-8-sig')):
     path=ROOT/item['Path']
-    if path.stat().st_size!=item['Bytes'] or file_sha(path)!=item['SHA256']:
-        raise RuntimeError('Package verification failed: '+item['Path'])
-update=['MagicForceClick.exe','MagicForceClick.cs','MagicForceClick.Core.cs','MagicForceClick.Settings.cs','MagicForceClick.Preview.cs','MagicForceClick.json','Open_MagicTrackpad_Settings.cmd','Update_MagicForceClick.ps1','Restore_MagicForceClick.ps1','README.md','RELEASE_NOTES_v'+VERSION+'.md','TEST_REPORT_v'+VERSION+'.md']
-with zipfile.ZipFile(OUT/('MagicForceClick-v'+VERSION+'-update.zip'),'w',zipfile.ZIP_DEFLATED) as z:
-    for name in update:z.write(ROOT/name,name)
-with zipfile.ZipFile(OUT/'MagicForceClick-baseline-2594280.zip','w',zipfile.ZIP_DEFLATED) as z:
-    for name in ['MagicForceClick.cs','MagicForceClick.exe']:
-        data=subprocess.check_output(['git','-C',str(ROOT),'show',BASELINE+':'+name])
-        if name.endswith('.exe') and sha(data)!='FC0BB943B15A6F0397EAE54CB702151D75D5B36A267ADC158280A829189358A4':raise RuntimeError('Baseline binary mismatch')
-        z.writestr(name,data)
-    z.writestr('BASELINE.txt','Baseline '+BASELINE+'\nKeep your upgrade snapshot to restore personal settings and startup.\n')
-with zipfile.ZipFile(OUT/'MagicForceClick-v1.1.0-rollback.zip','w',zipfile.ZIP_DEFLATED) as z:
-    for name in ['MagicForceClick.exe','MagicForceClick.cs','MagicForceClick.Core.cs','MagicForceClick.Settings.cs','MagicForceClick.json','Open_MagicTrackpad_Settings.cmd','Update_MagicForceClick.ps1','Restore_MagicForceClick.ps1']:
-        data=subprocess.check_output(['git','-C',str(ROOT),'show',PREVIOUS+':'+name])
-        if name.endswith('.exe') and sha(data)!='E2999F555030389922EBF1AA2EB81A7F7AFF66CDE6E3D0060DDF2208835BF697':raise RuntimeError('v1.1.0 binary mismatch')
-        z.writestr(name,data)
-    z.writestr('BASELINE.txt','v1.1.0 '+PREVIOUS+'\nUse your local snapshot to restore personal settings and startup exactly.\n')
-with zipfile.ZipFile(OUT/('Apple-Magic-Trackpad-Windows-v'+VERSION+'-full.zip'),'w',zipfile.ZIP_DEFLATED) as z:
-    for name in names:z.write(ROOT/name,name)
-    for filename in ['TestResults.txt','IntegrationResults.txt']:
-        z.write(ROOT/'artifacts'/filename,'SELFTEST/'+filename)
-(OUT/'SHA256SUMS-release.txt').write_text(''.join(file_sha(p)+'  '+p.name+'\n' for p in sorted(OUT.glob('*.zip'))),encoding='ascii')
-print(json.dumps({'assets':[p.name for p in sorted(OUT.iterdir())]},ensure_ascii=False))
+    if path.stat().st_size!=item['Bytes'] or digest(path)!=item['SHA256']:raise RuntimeError('Manifest mismatch: '+item['Path'])
+proof=json.loads((ROOT/'ControlCenter_Acceptance.json').read_text(encoding='utf-8-sig'))
+if digest(ROOT/'MagicControlCenter'/'MagicControlCenter.exe')!=proof['AppSha256']:raise RuntimeError('Unaccepted control-center binary')
+for name,value in proof['SourceSHA256'].items():
+    if digest(ROOT/name)!=value:raise RuntimeError('Control-center source differs from accepted binary: '+name)
+raw=subprocess.check_output(['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-Command',". ./Suite_Integration.ps1; ConvertTo-Json -InputObject @(Get-MagicTrackpadSuiteFiles) -Compress"],cwd=ROOT)
+runtime=[name.replace('\\','/') for name in json.loads(raw.decode('utf-8-sig'))]
+update_names=runtime+['README.md','RELEASE_NOTES_'+VERSION+'.md','TEST_REPORT_'+VERSION+'.md','MAGIC_CONTROL_CENTER.md','ControlCenter_Acceptance.json']+[name for name in names if name.startswith('docs/')]
+update={name:(ROOT/name).read_bytes() for name in update_names}
+checks=[{'Path':name,'Bytes':len(data),'SHA256':hashlib.sha256(data).hexdigest().upper()} for name,data in sorted(update.items())]
+update['SHA256SUMS-update.json']=json.dumps(checks,ensure_ascii=False,indent=2).encode()
+package(OUT/('MagicForceClick-'+VERSION+'-update.zip'),update)
+def report_bytes(path):
+    data=path.read_bytes()
+    encoding='utf-16' if data.startswith((b'\xff\xfe',b'\xfe\xff')) else 'utf-8-sig'
+    return data.decode(encoding).replace('\r\n','\n').encode('utf-8')
+full={name:(ROOT/name).read_bytes() for name in names}
+for relative in ['TestResults.txt','IntegrationResults.txt','SuiteUpgradeResults.txt','UpdateRollbackResults.txt']:
+    full['SELFTEST/'+relative]=report_bytes(ROOT/'artifacts'/relative)
+full['SELFTEST/ControlCenterResults.txt']=report_bytes(ROOT/'artifacts'/'control-center'/'ControlCenterResults.txt')
+package(OUT/('Apple-Magic-Trackpad-Windows-'+VERSION+'-full.zip'),full)
+history=[
+ ('MagicForceClick-baseline-2594280.zip','2594280052ed327c5a328f9b0e3d38f2ec7545ce',['MagicForceClick.cs','MagicForceClick.exe']),
+ ('MagicForceClick-v1.1.0-rollback.zip','fc364b2d53f9a177f2e366ab8d639506298cb283',['MagicForceClick.exe','MagicForceClick.cs','MagicForceClick.Core.cs','MagicForceClick.Settings.cs','MagicForceClick.json','Open_MagicTrackpad_Settings.cmd','Update_MagicForceClick.ps1','Restore_MagicForceClick.ps1']),
+ ('MagicForceClick-v1.1.1-rollback.zip','851a5aaa8724e6deaa027bc8a5171b7654847257',['MagicForceClick.exe','MagicForceClick.cs','MagicForceClick.Core.cs','MagicForceClick.Settings.cs','MagicForceClick.Preview.cs','MagicForceClick.json','Open_MagicTrackpad_Settings.cmd','Update_MagicForceClick.ps1','Restore_MagicForceClick.ps1'])
+]
+for filename,commit,paths in history:
+    entries={name:subprocess.check_output(['git','-C',str(ROOT),'show',commit+':'+name]) for name in paths}
+    entries['BASELINE.txt']=('Baseline '+commit+'\nFor exact personal configuration, GUI cleanup and startup restoration use your complete local upgrade snapshot. Do not overwrite personal JSON with package defaults.\n').encode()
+    package(OUT/filename,entries)
+(OUT/'SHA256SUMS-release.txt').write_text(''.join(digest(path)+'  '+path.name+'\n' for path in sorted(OUT.glob('*.zip'))),encoding='ascii')
+print(json.dumps({'version':VERSION,'assets':[p.name for p in sorted(OUT.iterdir())]},ensure_ascii=False))
