@@ -20,11 +20,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.release.tag_name || inputs.tag || github.sha }}
+          ref: ${{ github.sha }}
       - name: Resolve and validate release version
         shell: pwsh
         env:
-          REQUESTED_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          REQUESTED_TAG: ${{ inputs.tag }}
         run: |
           $version = (Get-Content -LiteralPath RELEASE_VERSION -Raw).Trim()
           $tag = $env:REQUESTED_TAG
@@ -54,12 +54,26 @@ jobs:
           $assets = Join-Path 'artifacts/release' $env:RELEASE_TAG
           $notes = 'RELEASE_NOTES_' + $env:RELEASE_TAG + '.md'
           $repo = $env:GITHUB_REPOSITORY
-          $existing = gh api "repos/$repo/releases/tags/$env:RELEASE_TAG" 2>$null
-          if ($LASTEXITCODE -ne 0) {
+          function Find-Release {
+            $json = gh api "repos/$repo/releases?per_page=100"
+            if ($LASTEXITCODE -ne 0) { throw 'Release discovery failed.' }
+            $releaseMatches = @($json | ConvertFrom-Json | Where-Object tag_name -eq $env:RELEASE_TAG)
+            if ($releaseMatches.Count -gt 1) { throw 'Duplicate release tags require manual review.' }
+            if ($releaseMatches.Count) { return $releaseMatches[0] }
+            return $null
+          }
+          $release = Find-Release
+          if (-not $release) {
             gh release create $env:RELEASE_TAG --repo $repo --target $env:GITHUB_SHA --title ('Magic Trackpad Windows Suite ' + $env:RELEASE_TAG) --notes-file $notes --draft
             if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }
+            $release = Find-Release
           }
-          $release = gh api "repos/$repo/releases/tags/$env:RELEASE_TAG" | ConvertFrom-Json
+          if (-not $release) { throw 'Created release is not readable.' }
+          if ($release.draft -and $release.target_commitish -ne $env:GITHUB_SHA) {
+            if (@($release.assets).Count) { throw 'Draft contains assets from another commit.' }
+            gh release edit $env:RELEASE_TAG --repo $repo --target $env:GITHUB_SHA
+            if ($LASTEXITCODE -ne 0) { throw 'Draft target update failed.' }
+          }
           foreach ($file in Get-ChildItem -LiteralPath $assets -File) {
             $previous = @($release.assets | Where-Object name -eq $file.Name)
             $digest = 'sha256:' + (Get-FileHash -LiteralPath $file.FullName).Hash.ToLowerInvariant()
@@ -71,7 +85,9 @@ jobs:
               if ($LASTEXITCODE -ne 0) { throw 'Asset upload failed.' }
             }
           }
-          $verified = gh api "repos/$repo/releases/tags/$env:RELEASE_TAG" | ConvertFrom-Json
+          $verified = gh api "repos/$repo/releases/$($release.id)" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Uploaded release is not readable.' }
+          if ($verified.target_commitish -ne $env:GITHUB_SHA) { throw 'Release target differs from the tested commit.' }
           foreach ($file in Get-ChildItem -LiteralPath $assets -File) {
             $asset = @($verified.assets | Where-Object name -eq $file.Name)
             if ($asset.Count -ne 1 -or $asset[0].digest -ne ('sha256:' + (Get-FileHash -LiteralPath $file.FullName).Hash.ToLowerInvariant())) { throw 'Uploaded asset digest mismatch.' }
