@@ -1,277 +1,302 @@
-[
-  {
-    "Path": ".gitattributes",
-    "Bytes": 82,
-    "SHA256": "1888F9B2414FAB2506C6A804FFCE939C1CA32E798F0658B438855D351C3BDCCC"
-  },
-  {
-    "Path": ".github/workflows/build.yml",
-    "Bytes": 374,
-    "SHA256": "ECAFB23AC9D5110137EADA80DFF08364EBA5E45789C82F5A7B9BF0789A8D5E35"
-  },
-  {
-    "Path": ".github/workflows/release.yml",
-    "Bytes": 2348,
-    "SHA256": "D5B01DF89DDE3C8AE737AC149E67F2029FC0232A16C46E933A3EB0E2F32FD959"
-  },
-  {
-    "Path": ".gitignore",
-    "Bytes": 323,
-    "SHA256": "52967941BE5B08380B22286804EFD8629AAA99C91E461DB3628C0FA0FB031889"
-  },
-  {
-    "Path": "AMD64/AmtPtpDevice.inf",
-    "Bytes": 6618,
-    "SHA256": "C7B43BCB38ED6B25F313AAEB12532E8CD83BB75BDAF40A05AC1A75E5D8362B07"
-  },
-  {
-    "Path": "AMD64/AmtPtpDeviceUsbUm.dll",
-    "Bytes": 70472,
-    "SHA256": "4AD457C205CBF41B023C4BBFFFA122E38329893570FDE95301EC272100E2D61D"
-  },
-  {
-    "Path": "AMD64/AmtPtpHidFilter.sys",
-    "Bytes": 51968,
-    "SHA256": "66D593CF6C902F6541562460952029FECD1D84EFB5CC6CF329B82A31D43988B7"
-  },
-  {
-    "Path": "AMD64/amtptpdevice.cat",
-    "Bytes": 15679,
-    "SHA256": "790016BCD4682CAEDBA7185FF062319D75C73F1B8C18F276FF0921DFA95D84E7"
-  },
-  {
-    "Path": "ARM64/AmtPtpDevice.inf",
-    "Bytes": 6618,
-    "SHA256": "F72448DC507C018BF02F60B3814D3A14CE9470587A88EB0B0C5E8BB8A4101AB1"
-  },
-  {
-    "Path": "ARM64/AmtPtpDeviceUsbUm.dll",
-    "Bytes": 66888,
-    "SHA256": "2C04AE6EBA3FD550C0EE691184FAFFAEAC03D164E1B8083FFD7A8138CACEA556"
-  },
-  {
-    "Path": "ARM64/AmtPtpHidFilter.sys",
-    "Bytes": 59176,
-    "SHA256": "32923E5FD2464240F4F2930B69046C8A9D9FC2594B5AD0081D34A04066562D89"
-  },
-  {
-    "Path": "ARM64/amtptpdevice.cat",
-    "Bytes": 15696,
-    "SHA256": "7A8D5854CCA9D5739F20AA223067CDBD1C2367E977C22AB5D2E7604556B1FA4E"
-  },
-  {
-    "Path": "AmtPtpControlPanel.exe",
-    "Bytes": 198544,
-    "SHA256": "666DD287FCBE0FB7B521C9F63AE9E17A8839028AEB958DEA7C955F8A569C9F73"
-  },
-  {
-    "Path": "Archive_Repair_20261022.json",
-    "Bytes": 341,
-    "SHA256": "C2A12601E17F1786A324E21DD65ECA1E18762C746404B4F4CE36D9D432EC91D4"
-  },
-  {
-    "Path": "Build.ps1",
-    "Bytes": 2288,
-    "SHA256": "79186454866F00211B352FA9FA629CF9894D935ED5CD96AE2ED78479C9F3F36B"
-  },
-  {
-    "Path": "ForceClick修复说明_20261022.txt",
-    "Bytes": 840,
-    "SHA256": "ABA99E9CFC9057ACF839D024C0E669829FA00AA5ED5CC8B9307F3F9077DB5C7C"
-  },
-  {
-    "Path": "Install_All_MagicTrackpad.ps1",
-    "Bytes": 13072,
-    "SHA256": "519075D6D828C07F980343FB356627362FB6DD52F13BE8E429020FB9D9209C5E"
-  },
-  {
-    "Path": "LICENSE",
-    "Bytes": 1063,
-    "SHA256": "0381E15E42922C8222F1DE3E9C537ED904BE8EB2ADBCDBB8F6383C19A75244B4"
-  },
-  {
-    "Path": "MagicForceClick.Core.cs",
-    "Bytes": 13804,
-    "SHA256": "FA83A9D222078F85DE77E2D05B7FB3EE881E2DC0276CCB72A67688A5601C9324"
-  },
-  {
-    "Path": "MagicForceClick.Preview.cs",
-    "Bytes": 3350,
-    "SHA256": "1A2DCD349BBC5AC56D8BEF15A6938E42736901EA560BBFF2623E02721C272069"
-  },
-  {
-    "Path": "MagicForceClick.Settings.cs",
-    "Bytes": 6948,
-    "SHA256": "6E24338D645209A4B4511CE6A1E5566C4F15EF29C8E4E2D2FFF547EA7B4BF59D"
-  },
-  {
-    "Path": "MagicForceClick.cs",
-    "Bytes": 31295,
-    "SHA256": "51230A996EBA9EE7DE4A488DFC0E4131D41145A3ABC149126AE56ADF2A816A5B"
-  },
-  {
-    "Path": "MagicForceClick.exe",
-    "Bytes": 35328,
-    "SHA256": "D443CE689D7FC2CAE2467F310B757559CE9082809BC31420FC1461EC6A25401B"
-  },
-  {
-    "Path": "MagicForceClick.json",
-    "Bytes": 505,
-    "SHA256": "2CDBA07543BA426899034638B1FC887219742F1C9345DD436CE1736FE69069BA"
-  },
-  {
-    "Path": "MagicTrackpad_AutoFix.ps1",
-    "Bytes": 4647,
-    "SHA256": "8349738F4C64385859691EF2C16939ECFFD3117E6C1887234C39E2F478E82B87"
-  },
-  {
-    "Path": "MagicTrackpad_AutoFix_Silent.vbs",
-    "Bytes": 487,
-    "SHA256": "D902CEEB2991F5E37B431C9B1769A950A3F70CC4C28FDB584680DBD7612EB5B6"
-  },
-  {
-    "Path": "Open_MagicTrackpad_Settings.cmd",
-    "Bytes": 59,
-    "SHA256": "22AED6D7EA48ED7E4A58E4A33ED8E70042FA90E7B070FDF217F594F9D33E93B1"
-  },
-  {
-    "Path": "QuickLook_Portable_Clean.zip.part1",
-    "Bytes": 67108864,
-    "SHA256": "BA1E9B15CB083313EFBD6421E30B3E8E3C3CD6B4B4D51B5BCFB3494AF516DDEB"
-  },
-  {
-    "Path": "QuickLook_Portable_Clean.zip.part2",
-    "Bytes": 55425893,
-    "SHA256": "61DB71FCFD3539114C0CC230ECE5C1BD6DA698924A44B86E54EAB83AC99B93CE"
-  },
-  {
-    "Path": "README.md",
-    "Bytes": 7870,
-    "SHA256": "FAAA1A90FAEADC2ABCF7B4236901E2E68D395D20F4E4C5343791E7F6DA0A48CB"
-  },
-  {
-    "Path": "README_AI配置指南.md",
-    "Bytes": 14111,
-    "SHA256": "BF04D318005D481C718124D8179F5298F05E70D575893B6B58445F1075A96033"
-  },
-  {
-    "Path": "RELEASE_NOTES_v1.1.0.md",
-    "Bytes": 1173,
-    "SHA256": "383AD62C2D667F17731013D8FD7DA39FCA582F7755A4D3947911355E1F8F5537"
-  },
-  {
-    "Path": "RELEASE_NOTES_v1.1.1.md",
-    "Bytes": 1768,
-    "SHA256": "09019B0D26DDABEB940E4A33FCAA496773F45EDE1835C62A8545A3597F17C990"
-  },
-  {
-    "Path": "RELEASE_VERSION",
-    "Bytes": 7,
-    "SHA256": "AAEEBC6AB5B9DD80BCA452EC7A63A7175F6E9CE9B81B34A66C85E94A5E4D38EC"
-  },
-  {
-    "Path": "Realtek_Bluetooth_Backup/README.md",
-    "Bytes": 710,
-    "SHA256": "C90CD8A12A680283763657E7310F2E630AAD86B0F973255863826F3FF276D97B"
-  },
-  {
-    "Path": "Realtek_Bluetooth_Backup/RTL8851BU_1.10.1061.3000/PidVid_List.dat",
-    "Bytes": 952,
-    "SHA256": "5752A0E712B718023AE973E31D13523D78F6CE17EDCC30D5E397F54564EE2947"
-  },
-  {
-    "Path": "Realtek_Bluetooth_Backup/RTL8851BU_1.10.1061.3000/RtkBtManServ.exe",
-    "Bytes": 660832,
-    "SHA256": "F12D806A9E11967048203A327531D947C3C2E4065F36F9C8F52F9E80E6768949"
-  },
-  {
-    "Path": "Realtek_Bluetooth_Backup/RTL8851BU_1.10.1061.3000/RtkBtfilter.sys",
-    "Bytes": 858760,
-    "SHA256": "56435F1D3233EE384952498DE30CC496257DADFA1C642FB430DC0D9125ED7BBC"
-  },
-  {
-    "Path": "Realtek_Bluetooth_Backup/RTL8851BU_1.10.1061.3000/RtkFilter.cat",
-    "Bytes": 12669,
-    "SHA256": "A3BCA44005EE7C50B1AF459ACBF68BE3E4CEFE05E0BD89074667C8CB582776B3"
-  },
-  {
-    "Path": "Realtek_Bluetooth_Backup/RTL8851BU_1.10.1061.3000/Rtkfilter.inf",
-    "Bytes": 3657,
-    "SHA256": "8671C965A2640229F4935158BD095B19A493ABABE4A38ADA28AFB7B6ADA3F65C"
-  },
-  {
-    "Path": "Realtek_Bluetooth_Backup/RTL8851BU_1.10.1061.3000/rtl8851b_bt_fw_rom_patch.dat",
-    "Bytes": 51840,
-    "SHA256": "69855E6CBA87627D148540B02EF7CD98E7062B7830B5C2053988D9127F7C9E40"
-  },
-  {
-    "Path": "Register_MagicTrackpad_AutoFix.ps1",
-    "Bytes": 1815,
-    "SHA256": "68DD79BA89D664D51982B7249CEF61B38FF2BEF984AA52D4C753D1E3E1777543"
-  },
-  {
-    "Path": "Repair_Verification_20261022.json",
-    "Bytes": 2489,
-    "SHA256": "E991BA42596518012C4FC445D94C3E82F182A502B35F2FD715036726432139D6"
-  },
-  {
-    "Path": "Restore_MagicForceClick.ps1",
-    "Bytes": 2626,
-    "SHA256": "D8755AB575F6D18D82B0BF58C2285D54D68A54AFE1B28773F94FD48F2D363F7F"
-  },
-  {
-    "Path": "Set_MagicTrackpad_UserSettings.ps1",
-    "Bytes": 3335,
-    "SHA256": "AFCE100792803160CEF36BFAA08AEF908B89DDC2FE669931B9178EC7437BE72C"
-  },
-  {
-    "Path": "TEST_REPORT_v1.1.0.md",
-    "Bytes": 1776,
-    "SHA256": "31F9FB74042E06B412075C4DFDF053CB25028C66EC5999F7982DF004779B51F2"
-  },
-  {
-    "Path": "TEST_REPORT_v1.1.1.md",
-    "Bytes": 2636,
-    "SHA256": "5FF81FA01EE27DF8044CBF971C4B96A5C7E3158B0094FCC16BDB1954F910D12B"
-  },
-  {
-    "Path": "ThreeFingersDragOnWindows_2.0.7_x64.Msix",
-    "Bytes": 16833217,
-    "SHA256": "7CD82B22BA36BA5B6408F2A08F26613F3090C90721C878E298E581634135D999"
-  },
-  {
-    "Path": "Update_MagicForceClick.ps1",
-    "Bytes": 4761,
-    "SHA256": "E086452A3FBAEC3550DAA9DA4725770B731E38149458ECF2A9C5762B66C9FBA1"
-  },
-  {
-    "Path": "tests/MagicForceClick.IntegrationTests.cs",
-    "Bytes": 3908,
-    "SHA256": "C97EDFA5E3288AFD037291E4ABD19BAEC9B11A7C4008373CA13B97B18821306F"
-  },
-  {
-    "Path": "tests/MagicForceClick.Tests.cs",
-    "Bytes": 22446,
-    "SHA256": "52367780065956E1EA164E28F2B4E47CED6742C219710F188C6F29A7E12F8574"
-  },
-  {
-    "Path": "tests/Test-UpdateRollback.ps1",
-    "Bytes": 3580,
-    "SHA256": "3534953334A4AB518CE9429D9D32BEBD1C026B900FC7EE5C7B688EE2170FCEC5"
-  },
-  {
-    "Path": "tools/Package_Release.py",
-    "Bytes": 3679,
-    "SHA256": "B8FDEE46EDFBF9B5967A30141F2CA75804F04996AF42D2C66081EBFA05532D6A"
-  },
-  {
-    "Path": "一键配置妙控板(管理员运行).cmd",
-    "Bytes": 276,
-    "SHA256": "C8CAF93CABD98EE9C9589E9FF6C4EA2632A1B3AC75A2ADBCD9572374E0C08E64"
-  },
-  {
-    "Path": "QuickLook_Portable_Clean.zip",
-    "Bytes": 122534757,
-    "SHA256": "D8A0F614775F25AB5BD33E2A9C9AABC67EC09E1DFA71ACE350941D36698FF024"
-  }
+﻿[
+    {
+        "Path":  ".gitattributes",
+        "Bytes":  82,
+        "SHA256":  "1888F9B2414FAB2506C6A804FFCE939C1CA32E798F0658B438855D351C3BDCCC"
+    },
+    {
+        "Path":  ".github/workflows/build.yml",
+        "Bytes":  374,
+        "SHA256":  "ECAFB23AC9D5110137EADA80DFF08364EBA5E45789C82F5A7B9BF0789A8D5E35"
+    },
+    {
+        "Path":  ".github/workflows/release.yml",
+        "Bytes":  2348,
+        "SHA256":  "D5B01DF89DDE3C8AE737AC149E67F2029FC0232A16C46E933A3EB0E2F32FD959"
+    },
+    {
+        "Path":  ".gitignore",
+        "Bytes":  323,
+        "SHA256":  "52967941BE5B08380B22286804EFD8629AAA99C91E461DB3628C0FA0FB031889"
+    },
+    {
+        "Path":  "AMD64/AmtPtpDevice.inf",
+        "Bytes":  6618,
+        "SHA256":  "C7B43BCB38ED6B25F313AAEB12532E8CD83BB75BDAF40A05AC1A75E5D8362B07"
+    },
+    {
+        "Path":  "AMD64/AmtPtpDeviceUsbUm.dll",
+        "Bytes":  70472,
+        "SHA256":  "4AD457C205CBF41B023C4BBFFFA122E38329893570FDE95301EC272100E2D61D"
+    },
+    {
+        "Path":  "AMD64/AmtPtpHidFilter.sys",
+        "Bytes":  51968,
+        "SHA256":  "66D593CF6C902F6541562460952029FECD1D84EFB5CC6CF329B82A31D43988B7"
+    },
+    {
+        "Path":  "AMD64/amtptpdevice.cat",
+        "Bytes":  15679,
+        "SHA256":  "790016BCD4682CAEDBA7185FF062319D75C73F1B8C18F276FF0921DFA95D84E7"
+    },
+    {
+        "Path":  "ARM64/AmtPtpDevice.inf",
+        "Bytes":  6618,
+        "SHA256":  "F72448DC507C018BF02F60B3814D3A14CE9470587A88EB0B0C5E8BB8A4101AB1"
+    },
+    {
+        "Path":  "ARM64/AmtPtpDeviceUsbUm.dll",
+        "Bytes":  66888,
+        "SHA256":  "2C04AE6EBA3FD550C0EE691184FAFFAEAC03D164E1B8083FFD7A8138CACEA556"
+    },
+    {
+        "Path":  "ARM64/AmtPtpHidFilter.sys",
+        "Bytes":  59176,
+        "SHA256":  "32923E5FD2464240F4F2930B69046C8A9D9FC2594B5AD0081D34A04066562D89"
+    },
+    {
+        "Path":  "ARM64/amtptpdevice.cat",
+        "Bytes":  15696,
+        "SHA256":  "7A8D5854CCA9D5739F20AA223067CDBD1C2367E977C22AB5D2E7604556B1FA4E"
+    },
+    {
+        "Path":  "AmtPtpControlPanel.exe",
+        "Bytes":  198544,
+        "SHA256":  "666DD287FCBE0FB7B521C9F63AE9E17A8839028AEB958DEA7C955F8A569C9F73"
+    },
+    {
+        "Path":  "Archive_Repair_20261022.json",
+        "Bytes":  341,
+        "SHA256":  "C2A12601E17F1786A324E21DD65ECA1E18762C746404B4F4CE36D9D432EC91D4"
+    },
+    {
+        "Path":  "Build.ps1",
+        "Bytes":  2288,
+        "SHA256":  "79186454866F00211B352FA9FA629CF9894D935ED5CD96AE2ED78479C9F3F36B"
+    },
+    {
+        "Path":  "ForceClick修复说明_20261022.txt",
+        "Bytes":  840,
+        "SHA256":  "ABA99E9CFC9057ACF839D024C0E669829FA00AA5ED5CC8B9307F3F9077DB5C7C"
+    },
+    {
+        "Path":  "Install_All_MagicTrackpad.ps1",
+        "Bytes":  13072,
+        "SHA256":  "519075D6D828C07F980343FB356627362FB6DD52F13BE8E429020FB9D9209C5E"
+    },
+    {
+        "Path":  "LICENSE",
+        "Bytes":  1063,
+        "SHA256":  "0381E15E42922C8222F1DE3E9C537ED904BE8EB2ADBCDBB8F6383C19A75244B4"
+    },
+    {
+        "Path":  "MagicForceClick.Core.cs",
+        "Bytes":  13804,
+        "SHA256":  "FA83A9D222078F85DE77E2D05B7FB3EE881E2DC0276CCB72A67688A5601C9324"
+    },
+    {
+        "Path":  "MagicForceClick.Preview.cs",
+        "Bytes":  3350,
+        "SHA256":  "1A2DCD349BBC5AC56D8BEF15A6938E42736901EA560BBFF2623E02721C272069"
+    },
+    {
+        "Path":  "MagicForceClick.Settings.cs",
+        "Bytes":  6948,
+        "SHA256":  "6E24338D645209A4B4511CE6A1E5566C4F15EF29C8E4E2D2FFF547EA7B4BF59D"
+    },
+    {
+        "Path":  "MagicForceClick.cs",
+        "Bytes":  31295,
+        "SHA256":  "51230A996EBA9EE7DE4A488DFC0E4131D41145A3ABC149126AE56ADF2A816A5B"
+    },
+    {
+        "Path":  "MagicForceClick.exe",
+        "Bytes":  35328,
+        "SHA256":  "D443CE689D7FC2CAE2467F310B757559CE9082809BC31420FC1461EC6A25401B"
+    },
+    {
+        "Path":  "MagicForceClick.json",
+        "Bytes":  505,
+        "SHA256":  "2CDBA07543BA426899034638B1FC887219742F1C9345DD436CE1736FE69069BA"
+    },
+    {
+        "Path":  "MagicTrackpad_AutoFix.ps1",
+        "Bytes":  4647,
+        "SHA256":  "8349738F4C64385859691EF2C16939ECFFD3117E6C1887234C39E2F478E82B87"
+    },
+    {
+        "Path":  "MagicTrackpad_AutoFix_Silent.vbs",
+        "Bytes":  487,
+        "SHA256":  "D902CEEB2991F5E37B431C9B1769A950A3F70CC4C28FDB584680DBD7612EB5B6"
+    },
+    {
+        "Path":  "Open_MagicTrackpad_Settings.cmd",
+        "Bytes":  59,
+        "SHA256":  "22AED6D7EA48ED7E4A58E4A33ED8E70042FA90E7B070FDF217F594F9D33E93B1"
+    },
+    {
+        "Path":  "QuickLook_Portable_Clean.zip.part1",
+        "Bytes":  67108864,
+        "SHA256":  "BA1E9B15CB083313EFBD6421E30B3E8E3C3CD6B4B4D51B5BCFB3494AF516DDEB"
+    },
+    {
+        "Path":  "QuickLook_Portable_Clean.zip.part2",
+        "Bytes":  55425893,
+        "SHA256":  "61DB71FCFD3539114C0CC230ECE5C1BD6DA698924A44B86E54EAB83AC99B93CE"
+    },
+    {
+        "Path":  "README.md",
+        "Bytes":  20989,
+        "SHA256":  "D68FD54C347084A7427154BAFB8E8F6B1D2BA05559AAD9B804F7B7D9CC0430EC"
+    },
+    {
+        "Path":  "README_AI配置指南.md",
+        "Bytes":  14111,
+        "SHA256":  "BF04D318005D481C718124D8179F5298F05E70D575893B6B58445F1075A96033"
+    },
+    {
+        "Path":  "RELEASE_NOTES_v1.1.0.md",
+        "Bytes":  1173,
+        "SHA256":  "383AD62C2D667F17731013D8FD7DA39FCA582F7755A4D3947911355E1F8F5537"
+    },
+    {
+        "Path":  "RELEASE_NOTES_v1.1.1.md",
+        "Bytes":  1768,
+        "SHA256":  "09019B0D26DDABEB940E4A33FCAA496773F45EDE1835C62A8545A3597F17C990"
+    },
+    {
+        "Path":  "RELEASE_VERSION",
+        "Bytes":  7,
+        "SHA256":  "AAEEBC6AB5B9DD80BCA452EC7A63A7175F6E9CE9B81B34A66C85E94A5E4D38EC"
+    },
+    {
+        "Path":  "Realtek_Bluetooth_Backup/README.md",
+        "Bytes":  710,
+        "SHA256":  "C90CD8A12A680283763657E7310F2E630AAD86B0F973255863826F3FF276D97B"
+    },
+    {
+        "Path":  "Realtek_Bluetooth_Backup/RTL8851BU_1.10.1061.3000/PidVid_List.dat",
+        "Bytes":  952,
+        "SHA256":  "5752A0E712B718023AE973E31D13523D78F6CE17EDCC30D5E397F54564EE2947"
+    },
+    {
+        "Path":  "Realtek_Bluetooth_Backup/RTL8851BU_1.10.1061.3000/RtkBtManServ.exe",
+        "Bytes":  660832,
+        "SHA256":  "F12D806A9E11967048203A327531D947C3C2E4065F36F9C8F52F9E80E6768949"
+    },
+    {
+        "Path":  "Realtek_Bluetooth_Backup/RTL8851BU_1.10.1061.3000/RtkBtfilter.sys",
+        "Bytes":  858760,
+        "SHA256":  "56435F1D3233EE384952498DE30CC496257DADFA1C642FB430DC0D9125ED7BBC"
+    },
+    {
+        "Path":  "Realtek_Bluetooth_Backup/RTL8851BU_1.10.1061.3000/RtkFilter.cat",
+        "Bytes":  12669,
+        "SHA256":  "A3BCA44005EE7C50B1AF459ACBF68BE3E4CEFE05E0BD89074667C8CB582776B3"
+    },
+    {
+        "Path":  "Realtek_Bluetooth_Backup/RTL8851BU_1.10.1061.3000/Rtkfilter.inf",
+        "Bytes":  3657,
+        "SHA256":  "8671C965A2640229F4935158BD095B19A493ABABE4A38ADA28AFB7B6ADA3F65C"
+    },
+    {
+        "Path":  "Realtek_Bluetooth_Backup/RTL8851BU_1.10.1061.3000/rtl8851b_bt_fw_rom_patch.dat",
+        "Bytes":  51840,
+        "SHA256":  "69855E6CBA87627D148540B02EF7CD98E7062B7830B5C2053988D9127F7C9E40"
+    },
+    {
+        "Path":  "Register_MagicTrackpad_AutoFix.ps1",
+        "Bytes":  1815,
+        "SHA256":  "68DD79BA89D664D51982B7249CEF61B38FF2BEF984AA52D4C753D1E3E1777543"
+    },
+    {
+        "Path":  "Repair_Verification_20261022.json",
+        "Bytes":  2489,
+        "SHA256":  "E991BA42596518012C4FC445D94C3E82F182A502B35F2FD715036726432139D6"
+    },
+    {
+        "Path":  "Restore_MagicForceClick.ps1",
+        "Bytes":  2626,
+        "SHA256":  "D8755AB575F6D18D82B0BF58C2285D54D68A54AFE1B28773F94FD48F2D363F7F"
+    },
+    {
+        "Path":  "Set_MagicTrackpad_UserSettings.ps1",
+        "Bytes":  3335,
+        "SHA256":  "AFCE100792803160CEF36BFAA08AEF908B89DDC2FE669931B9178EC7437BE72C"
+    },
+    {
+        "Path":  "TEST_REPORT_v1.1.0.md",
+        "Bytes":  1776,
+        "SHA256":  "31F9FB74042E06B412075C4DFDF053CB25028C66EC5999F7982DF004779B51F2"
+    },
+    {
+        "Path":  "TEST_REPORT_v1.1.1.md",
+        "Bytes":  2636,
+        "SHA256":  "5FF81FA01EE27DF8044CBF971C4B96A5C7E3158B0094FCC16BDB1954F910D12B"
+    },
+    {
+        "Path":  "ThreeFingersDragOnWindows_2.0.7_x64.Msix",
+        "Bytes":  16833217,
+        "SHA256":  "7CD82B22BA36BA5B6408F2A08F26613F3090C90721C878E298E581634135D999"
+    },
+    {
+        "Path":  "Update_MagicForceClick.ps1",
+        "Bytes":  4761,
+        "SHA256":  "E086452A3FBAEC3550DAA9DA4725770B731E38149458ECF2A9C5762B66C9FBA1"
+    },
+    {
+        "Path":  "docs/README.en.md",
+        "Bytes":  9783,
+        "SHA256":  "44482CF4579DF5E9F7AE96D9EB0C8390131C51436DE3225494D612AEB7DED3D6"
+    },
+    {
+        "Path":  "docs/assets/demo-pipeline-dark.svg",
+        "Bytes":  6198,
+        "SHA256":  "C2DC0758938ADF47C7A9449428D8D02ACCD5EB84ED143D7B613314559DC20B16"
+    },
+    {
+        "Path":  "docs/assets/demo-pipeline-light.svg",
+        "Bytes":  6198,
+        "SHA256":  "807072C33A22A43BB2FAD46F3A01F42DACA86805E2DCFEF9FF4647CD19D19794"
+    },
+    {
+        "Path":  "docs/assets/hero-dark.svg",
+        "Bytes":  4575,
+        "SHA256":  "5D6F4758F3E50DD3C67C177AE0F8318F3FAC5780DF6542CF57307506A9BBCD2D"
+    },
+    {
+        "Path":  "docs/assets/hero-light.svg",
+        "Bytes":  4575,
+        "SHA256":  "C64C721C62CC8EDEA64677057F7B137218295F141F78360B55DF247103E36D3B"
+    },
+    {
+        "Path":  "tests/MagicForceClick.IntegrationTests.cs",
+        "Bytes":  3908,
+        "SHA256":  "C97EDFA5E3288AFD037291E4ABD19BAEC9B11A7C4008373CA13B97B18821306F"
+    },
+    {
+        "Path":  "tests/MagicForceClick.Tests.cs",
+        "Bytes":  22446,
+        "SHA256":  "52367780065956E1EA164E28F2B4E47CED6742C219710F188C6F29A7E12F8574"
+    },
+    {
+        "Path":  "tests/Test-UpdateRollback.ps1",
+        "Bytes":  3580,
+        "SHA256":  "3534953334A4AB518CE9429D9D32BEBD1C026B900FC7EE5C7B688EE2170FCEC5"
+    },
+    {
+        "Path":  "tools/Package_Release.py",
+        "Bytes":  3679,
+        "SHA256":  "B8FDEE46EDFBF9B5967A30141F2CA75804F04996AF42D2C66081EBFA05532D6A"
+    },
+    {
+        "Path":  "一键配置妙控板(管理员运行).cmd",
+        "Bytes":  276,
+        "SHA256":  "C8CAF93CABD98EE9C9589E9FF6C4EA2632A1B3AC75A2ADBCD9572374E0C08E64"
+    },
+    {
+        "Path":  "QuickLook_Portable_Clean.zip",
+        "Bytes":  122534757,
+        "SHA256":  "D8A0F614775F25AB5BD33E2A9C9AABC67EC09E1DFA71ACE350941D36698FF024"
+    }
 ]

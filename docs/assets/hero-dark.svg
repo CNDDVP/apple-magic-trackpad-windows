@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="340" viewBox="0 0 1080 340" role="img" aria-labelledby="title desc">
+<title id="title">Apple Magic Trackpad Windows Suite</title>
+<desc id="desc">Apple Magic Trackpad Windows Suite banner showing a silver multi-touch trackpad, hardware ScanTime S-curve trajectory, and Force Click preview badge for Windows 11.</desc>
+<defs>
+  <radialGradient id="glow"><stop stop-color="#074836"/><stop offset="1" stop-color="#0d1518" stop-opacity="0"/></radialGradient>
+  <linearGradient id="aluminum" x1="0" y1="0" x2="0.7" y2="1"><stop stop-color="#ffffff"/><stop offset="0.7" stop-color="#e8eef0"/><stop offset="1" stop-color="#bac8cb"/></linearGradient>
+  <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#f1f6f4"/></linearGradient>
+  <linearGradient id="trail" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#008c66" stop-opacity="0.18"/><stop offset="1" stop-color="#16bd92"/></linearGradient>
+  <filter id="shadow" x="-35%" y="-35%" width="180%" height="200%"><feDropShadow dx="0" dy="18" stdDeviation="15" flood-color="#043928" flood-opacity="0.18"/></filter>
+</defs>
+<rect x="1" y="1" width="1078" height="338" rx="26" fill="#0d1518" stroke="#233d35"/>
+<ellipse cx="900" cy="175" rx="340" ry="260" fill="url(#glow)"/>
+<ellipse cx="150" cy="340" rx="360" ry="170" fill="url(#glow)" opacity="0.45"/>
+<g fill="none" stroke="#3fe0b5" stroke-width="1.5" opacity="0.35"><path d="M35 60V35h25M1020 35h25v25M1045 280v25h-25M60 305H35v-25"/></g>
+<g transform="translate(76 54)">
+  <rect x="0" y="0" width="34" height="25" rx="6" fill="none" stroke="#3fe0b5" stroke-width="2.3"/>
+  <path d="M9 17c1-4 5-6 9-6m-1-4 3 4-4 3" fill="none" stroke="#3fe0b5" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="47" y="18" fill="#9bb5ac" font-family="Segoe UI,Arial,sans-serif" font-size="13.5" font-weight="600" letter-spacing="2.2">APPLE MAGIC TRACKPAD · USB-C &amp; LIGHTNING</text>
+</g>
+<text x="74" y="150" fill="#eefcf6" font-family="Segoe UI,Arial,sans-serif" font-size="60" font-weight="700" letter-spacing="-2.2">Magic Trackpad</text>
+<text x="78" y="196" fill="#3fe0b5" font-family="Segoe UI,Arial,sans-serif" font-size="23" font-weight="700" letter-spacing="5.2">WINDOWS 11 SUITE · v1.1.1</text>
+<text x="78" y="238" fill="#9bb5ac" font-family="Segoe UI,Arial,sans-serif" font-size="17.5">Signed PTP Driver · 100µs ScanTime S-Curve · Force Click Preview · Snapshot Rollback</text>
+<g transform="translate(78 262)">
+  <rect x="0" y="0" width="166" height="30" rx="15" fill="#172c28" stroke="#233d35"/>
+  <text x="83" y="20" text-anchor="middle" fill="#3fe0b5" font-family="Consolas,Segoe UI,monospace" font-size="12.5" font-weight="600">QuickLook + Opus 13</text>
+  <rect x="178" y="0" width="178" height="30" rx="15" fill="#172c28" stroke="#233d35"/>
+  <text x="267" y="20" text-anchor="middle" fill="#3fe0b5" font-family="Consolas,Segoe UI,monospace" font-size="12.5" font-weight="600">Per-Monitor SendInput</text>
+  <rect x="368" y="0" width="154" height="30" rx="15" fill="#172c28" stroke="#233d35"/>
+  <text x="445" y="20" text-anchor="middle" fill="#3fe0b5" font-family="Consolas,Segoe UI,monospace" font-size="12.5" font-weight="600">69 Automated Checks</text>
+</g>
+<g transform="translate(742 62) rotate(-8 125 100)" filter="url(#shadow)">
+  <rect x="-4" y="7" width="255" height="192" rx="23" fill="url(#aluminum)" stroke="#a7b9b4"/>
+  <rect x="-3" y="0" width="255" height="188" rx="23" fill="url(#surface)" stroke="#d8e3de"/>
+  <path d="M14 5h217" stroke="#ffffff" stroke-width="2" opacity="0.8"/>
+  <path d="M58 134c19-47 52-68 114-68" fill="none" stroke="#c9eee0" stroke-width="22" stroke-linecap="round"/>
+  <path d="M58 134c19-47 52-68 114-68" fill="none" stroke="url(#trail)" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="m163 56 12 10-12 10" fill="none" stroke="#10ad83" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="58" cy="134" r="18" fill="none" stroke="#10ad83" stroke-width="1.6" stroke-dasharray="4 3" opacity="0.75"/>
+  <circle cx="58" cy="134" r="9" fill="#ffffff" stroke="#10ad83" stroke-width="3"/>
+  <circle cx="122" cy="92" r="4.5" fill="#8bdcbd"/>
+</g>
+<g transform="translate(796 286)"><circle cx="0" cy="0" r="4" fill="#3fe0b5"/><text x="12" y="4" fill="#9bb5ac" font-family="Segoe UI,Arial,sans-serif" font-size="12" font-weight="600" letter-spacing="0.8">WINDOWS 11 24H2+ · AMD64 &amp; ARM64</text></g>
+</svg>

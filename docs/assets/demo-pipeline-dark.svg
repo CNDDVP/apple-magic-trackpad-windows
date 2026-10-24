@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="290" viewBox="0 0 1080 290" role="img" aria-labelledby="ptitle pdesc">
+<title id="ptitle">MagicForceClick Real-Time Input &amp; Preview Pipeline</title>
+<desc id="pdesc">Four-stage diagram showing 112-byte HID Report 0x05 ScanTime parsing, S-Curve and Per-Monitor SendInput compensation, Force Click and Drag Interlock state machine, and Explorer QuickLook or Directory Opus 13 preview dispatch.</desc>
+<rect x="1" y="1" width="1078" height="288" rx="20" fill="#0d1518" stroke="#233d35"/>
+<text x="36" y="38" fill="#eefcf6" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">REAL-TIME HID &amp; FORCE CLICK PIPELINE</text>
+<text x="360" y="38" fill="#9bb5ac" font-family="Consolas,Segoe UI,monospace" font-size="12.5">ReportID=0x05 (112B)  ──►  ScanTime Δt (100µs)  ──►  SendInput (65535 Virtual Desktop)  ──►  Preview Router</text>
+
+<!-- Stage 1 -->
+<g transform="translate(28 60)">
+  <rect x="0" y="0" width="236" height="196" rx="14" fill="#132026" stroke="#233d35" stroke-width="1.5"/>
+  <rect x="16" y="16" width="74" height="22" rx="6" fill="#172c28"/>
+  <text x="53" y="31" text-anchor="middle" fill="#3fe0b5" font-family="Consolas,monospace" font-size="11.5" font-weight="700">STAGE 01</text>
+  <text x="16" y="60" fill="#eefcf6" font-family="Segoe UI,Arial,sans-serif" font-size="15.5" font-weight="700">HID 扫描帧解析</text>
+  <text x="16" y="84" fill="#9bb5ac" font-family="Consolas,monospace" font-size="12">ReportID = 0x05 (112B)</text>
+  <text x="16" y="108" fill="#9bb5ac" font-family="Segoe UI,Arial,sans-serif" font-size="12.5">• 100µs 硬件 ScanTime 计数</text>
+  <text x="16" y="130" fill="#9bb5ac" font-family="Segoe UI,Arial,sans-serif" font-size="12.5">• 16-bit 回绕与重复帧过滤</text>
+  <text x="16" y="152" fill="#9bb5ac" font-family="Segoe UI,Arial,sans-serif" font-size="12.5">• 蓝牙批量到达消抖与断连重置</text>
+  <text x="16" y="176" fill="#3fe0b5" font-family="Consolas,monospace" font-size="11.5">摆脱系统消息队列抖动</text>
+</g>
+
+<path d="M268 158h18m-6-5 6 5-6 5" fill="none" stroke="#3fe0b5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+<!-- Stage 2 -->
+<g transform="translate(290 60)">
+  <rect x="0" y="0" width="244" height="196" rx="14" fill="#132026" stroke="#233d35" stroke-width="1.5"/>
+  <rect x="16" y="16" width="74" height="22" rx="6" fill="#172c28"/>
+  <text x="53" y="31" text-anchor="middle" fill="#3fe0b5" font-family="Consolas,monospace" font-size="11.5" font-weight="700">STAGE 02</text>
+  <text x="16" y="60" fill="#eefcf6" font-family="Segoe UI,Arial,sans-serif" font-size="15.5" font-weight="700">S 型加速与多屏补偿</text>
+  <text x="16" y="84" fill="#9bb5ac" font-family="Consolas,monospace" font-size="12">Gain: 0.95 ──► 3.40 / 3.50</text>
+  <text x="16" y="108" fill="#9bb5ac" font-family="Segoe UI,Arial,sans-serif" font-size="12.5">• EDID 物理尺寸 + DPI 密度比</text>
+  <text x="16" y="130" fill="#9bb5ac" font-family="Segoe UI,Arial,sans-serif" font-size="12.5">• SendInput 绝对虚拟桌面坐标</text>
+  <text x="16" y="152" fill="#9bb5ac" font-family="Segoe UI,Arial,sans-serif" font-size="12.5">• 负坐标/屏幕空隙/像素中心映射</text>
+  <text x="16" y="176" fill="#3fe0b5" font-family="Consolas,monospace" font-size="11.5">快甩跨屏反向回跳: 22 ──► 0</text>
+</g>
+
+<path d="M538 158h18m-6-5 6 5-6 5" fill="none" stroke="#3fe0b5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+<!-- Stage 3 -->
+<g transform="translate(560 60)">
+  <rect x="0" y="0" width="244" height="196" rx="14" fill="#132026" stroke="#233d35" stroke-width="1.5"/>
+  <rect x="16" y="16" width="74" height="22" rx="6" fill="#172c28"/>
+  <text x="53" y="31" text-anchor="middle" fill="#3fe0b5" font-family="Consolas,monospace" font-size="11.5" font-weight="700">STAGE 03</text>
+  <text x="16" y="60" fill="#eefcf6" font-family="Segoe UI,Arial,sans-serif" font-size="15.5" font-weight="700">深按状态机与拖拽互斥</text>
+  <text x="16" y="84" fill="#9bb5ac" font-family="Consolas,monospace" font-size="12">180 直达 | 90+180ms+Δ15 轻压</text>
+  <text x="16" y="108" fill="#9bb5ac" font-family="Segoe UI,Arial,sans-serif" font-size="12.5">• 物理按下即锚定起点与基准力</text>
+  <text x="16" y="130" fill="#9bb5ac" font-family="Segoe UI,Arial,sans-serif" font-size="12.5">• 位移 &gt; 4px / 多指即锁定为拖拽</text>
+  <text x="16" y="152" fill="#9bb5ac" font-family="Segoe UI,Arial,sans-serif" font-size="12.5">• 普通长按不误触，回落重计时</text>
+  <text x="16" y="176" fill="#3fe0b5" font-family="Consolas,monospace" font-size="11.5">4132 帧实机回放 0 误触发</text>
+</g>
+
+<path d="M808 158h18m-6-5 6 5-6 5" fill="none" stroke="#3fe0b5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+<!-- Stage 4 -->
+<g transform="translate(830 60)">
+  <rect x="0" y="0" width="222" height="196" rx="14" fill="#132026" stroke="#233d35" stroke-width="1.5"/>
+  <rect x="16" y="16" width="74" height="22" rx="6" fill="#172c28"/>
+  <text x="53" y="31" text-anchor="middle" fill="#3fe0b5" font-family="Consolas,monospace" font-size="11.5" font-weight="700">STAGE 04</text>
+  <text x="16" y="60" fill="#eefcf6" font-family="Segoe UI,Arial,sans-serif" font-size="15.5" font-weight="700">安全焦点预览路由</text>
+  <text x="16" y="84" fill="#9bb5ac" font-family="Consolas,monospace" font-size="12">Explorer / Desktop / Opus</text>
+  <text x="16" y="108" fill="#9bb5ac" font-family="Segoe UI,Arial,sans-serif" font-size="12.5">• Explorer/桌面唤起 QuickLook</text>
+  <text x="16" y="130" fill="#9bb5ac" font-family="Segoe UI,Arial,sans-serif" font-size="12.5">• Opus 13 仅限文件列表发 Space</text>
+  <text x="16" y="152" fill="#9bb5ac" font-family="Segoe UI,Arial,sans-serif" font-size="12.5">• 排除重命名/搜索/对话框/修饰键</text>
+  <text x="16" y="176" fill="#3fe0b5" font-family="Consolas,monospace" font-size="11.5">发送前二次复核前台与焦点</text>
+</g>
+</svg>
