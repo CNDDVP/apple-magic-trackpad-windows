@@ -1,6 +1,16 @@
-﻿# Apple Magic Trackpad Windows Suite 1.1.0
+﻿# Apple Magic Trackpad Windows Suite 1.1.1
 
-Apple USB-C / Lightning 妙控板在 Windows 11 上的签名驱动、原生手势设置、深按 QuickLook 预览及维护工具。底层驱动仍为发行包 v2.2 / INF `2026.3982.1.1000`；本页的 **1.1.0 是工具套件版本**。
+Apple USB-C / Lightning 妙控板在 Windows 11 上的签名驱动、原生手势设置、深按文件预览及维护工具。底层驱动仍为发行包 v2.2 / INF `2026.3982.1.1000`；本页的 **1.1.1 是工具套件版本**。
+
+## 1.1.1 的修复与可选手感
+
+- **Directory Opus 13 深按预览**：识别 `dopus.exe` 的 Lister 文件列表，调用现有的空格预览动作。重命名框、地址栏、搜索框、嵌入式预览器、对话框及按住修饰键时均不发空格；等待期间焦点改变也会取消。用户已在 Opus 13.25 x64 / 蓝牙 A3120 上确认深按可预览。
+- **“轻压跨屏”预设**：压力阈值90、稳定按压180ms，还需比本次物理按下时增加至少15的压力；只保持普通按压不会变成长按预览。达到180的明确深按保留即时响应。最终温和曲线为慢速增益0.95、最大增益3.5、介入速度3.8、指数2.0；用户已确认预览省力、跨屏速度合适、定位和连续移动正常。
+- **低压力下的拖动保护**：从物理按下时锚定位置和初始力度，中途压力回落重新计时，移动/多指/接触更换仍锁定取消。阈值低于120必须同时启用至少120ms稳定判断和10的额外加力要求；默认180/0ms配置保持兼容。
+- **多屏位置补偿**：通过Windows `SendInput` 的绝对虚拟桌面坐标提交，处理负坐标、屏幕间空隙和像素中心映射；不再直接用`SetCursorPos`改位置。运行状态记录输入提交失败次数。
+- **保留个人设置**：升级仍保留已有JSON，发布默认值也沿用v1.1参数。需要轻压方案时，打开设置，点“轻压跨屏”后保存；“v1.1 手感”可恢复原参数。
+
+预览在资源管理器/桌面使用QuickLook，在Directory Opus文件列表使用现有Space操作。Opus中须先配置好Space可以预览。没有新增独立第二次震动。
 
 ## 1.1.0 的三项改进
 
@@ -46,6 +56,8 @@ Windows 11 24H2 / Build 26100+，64位PowerShell；使用当前交互用户的�
 git clone https://github.com/CNDDVP/apple-magic-trackpad-windows.git
 cd apple-magic-trackpad-windows
 .\Install_All_MagicTrackpad.ps1 -CursorSpeed 14 -ForceClickThreshold 180
+# 直接使用实机校准的轻压与温和跨屏方案
+.\Install_All_MagicTrackpad.ps1 -CursorSpeed 14 -LightCrossScreen
 ```
 
 主脚本合并两个QuickLook分卷并验证SHA256，安装对应架构的Apple驱动，配置USB/蓝牙两分支、原生触控板参数、QuickLook、自启和维护任务。驱动安装可能需要重连或重启；首次蓝牙配对仍需手动完成。
@@ -56,9 +68,9 @@ cd apple-magic-trackpad-windows
 
 - `MagicForceClick.json`：版本化配置。`EnableForceClick` / `EnableAcceleration` / `EnableMonitorCompensation` 为独立开关，`AccelerateWhilePressed` 可关闭按住时的额外S型加速。
 - `MagicForceClick.status.json`：当前生效设置、RawInput注册、有效/重复扫描帧和计时重置统计。它是诊断状态，不作为设备实际手势正常的唯一证据。
-- `MagicForceClick.Core.cs`：可离线测试的扫描时间、曲线、按压状态机；`MagicForceClick.Settings.cs`：设置窗口。
-- `Build.ps1`：用.NET Framework编译器构建程序并运行39项行为测试、4项配置/界面集成测试。`tests/Test-UpdateRollback.ps1`另验证更新与回退；真实程序已运行时还测试启动失败自动恢复，总计5项。
-- `.github/workflows/build.yml`：Windows构建和行为/集成测试；发布Release后，`release.yml`校验文件并自动生成、上传更新包、完整包、基线包和校验清单。
+- `MagicForceClick.Core.cs`：可离线测试的扫描时间、曲线、按压状态机与预览路由；`MagicForceClick.Preview.cs`：前台窗口/焦点检查；`MagicForceClick.Settings.cs`：设置窗口。
+- `Build.ps1`：用.NET Framework编译器构建程序并运行59项行为测试、5项配置/界面/输入结构集成测试。`tests/Test-UpdateRollback.ps1`另验证更新与回退；真实程序已运行时还测试启动失败自动恢复，总计5项。
+- `.github/workflows/build.yml`：Windows构建和行为/集成测试；main的`RELEASE_VERSION`变更或手动发布Release后，`release.yml`先构建/测试/校验，再创建Release并上传更新包、完整包、两份基线包和校验清单。
 - `SHA256SUMS.json`：自动生成的发布文件大小与SHA256；不包含自身、构建缓存或个人回退快照。
 
 ```powershell

@@ -8,9 +8,11 @@ param(
  [string]$TargetDir="$env:LOCALAPPDATA\Programs\MagicTrackpad",
  [ValidateRange(120,250)][int]$ForceClickThreshold=180,
  [ValidateRange(1,20)][int]$CursorSpeed=14,
- [switch]$EnableThreeFingerDrag
+ [switch]$EnableThreeFingerDrag,
+ [switch]$LightCrossScreen
 )
 $ErrorActionPreference='Stop'
+if($LightCrossScreen -and $PSBoundParameters.ContainsKey('ForceClickThreshold')){throw 'Choose either -LightCrossScreen or an explicit -ForceClickThreshold.'}
 $PackageRoot=$PSScriptRoot
 $stamp=Get-Date -Format yyyyMMdd_HHmmss
 $backup=Join-Path $env:LOCALAPPDATA "MagicTrackpad_Backups\$stamp"
@@ -35,7 +37,7 @@ try {
    } finally { $outStream.Dispose() }
   }
  }
- $runtimeFiles=@('AmtPtpControlPanel.exe','MagicForceClick.cs','MagicForceClick.Core.cs','MagicForceClick.Settings.cs','MagicForceClick.json','Open_MagicTrackpad_Settings.cmd','Update_MagicForceClick.ps1','Restore_MagicForceClick.ps1','MagicForceClick.exe','MagicTrackpad_AutoFix.ps1','MagicTrackpad_AutoFix_Silent.vbs','Set_MagicTrackpad_UserSettings.ps1','Register_MagicTrackpad_AutoFix.ps1')
+ $runtimeFiles=@('AmtPtpControlPanel.exe','MagicForceClick.cs','MagicForceClick.Core.cs','MagicForceClick.Settings.cs','MagicForceClick.Preview.cs','MagicForceClick.json','Open_MagicTrackpad_Settings.cmd','Update_MagicForceClick.ps1','Restore_MagicForceClick.ps1','MagicForceClick.exe','MagicTrackpad_AutoFix.ps1','MagicTrackpad_AutoFix_Silent.vbs','Set_MagicTrackpad_UserSettings.ps1','Register_MagicTrackpad_AutoFix.ps1')
  foreach($file in ($runtimeFiles + @('QuickLook_Portable_Clean.zip',"$arch\AmtPtpDevice.inf","$arch\amtptpdevice.cat"))) {
   if(-not(Test-Path -LiteralPath (Join-Path $PackageRoot $file))) {throw "Missing package file: $file"}
  }
@@ -87,7 +89,7 @@ try {
  $csc="$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
  if(Test-Path -LiteralPath $csc){
   $candidate=Join-Path $TargetDir 'MagicForceClick.candidate.exe'
-  & $csc /nologo /target:winexe /platform:anycpu /optimize+ /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Runtime.Serialization.dll "/out:$candidate" (Join-Path $TargetDir 'MagicForceClick.cs') (Join-Path $TargetDir 'MagicForceClick.Core.cs') (Join-Path $TargetDir 'MagicForceClick.Settings.cs')
+  & $csc /nologo /target:winexe /platform:anycpu /optimize+ /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Runtime.Serialization.dll "/out:$candidate" (Join-Path $TargetDir 'MagicForceClick.cs') (Join-Path $TargetDir 'MagicForceClick.Core.cs') (Join-Path $TargetDir 'MagicForceClick.Settings.cs') (Join-Path $TargetDir 'MagicForceClick.Preview.cs')
   if($LASTEXITCODE -ne 0){throw "ForceClick build failed: $LASTEXITCODE"}
   Move-Item -LiteralPath $candidate -Destination $exeFile -Force
  }
@@ -130,7 +132,8 @@ try {
  $optionsType=$optionsAssembly.GetType('MagicForceClick.ForceClickOptions',$true)
  $optionsPath=Join-Path $TargetDir 'MagicForceClick.json'
  $options=$optionsType.GetMethod('Load').Invoke($null,[object[]]@([string]$optionsPath))
- $options.ForceClickThreshold=$ForceClickThreshold
+ if($LightCrossScreen){$options.ApplyLightCrossScreenPreset()}
+ elseif($PSBoundParameters.ContainsKey('ForceClickThreshold')){$options.ForceClickThreshold=$ForceClickThreshold}
  $options.Save([string]$optionsPath)
  $forceCommand='"'+$exeFile+'"'
  New-ItemProperty -LiteralPath $runKey -Name MagicForceClick -Value $forceCommand -PropertyType String -Force | Out-Null

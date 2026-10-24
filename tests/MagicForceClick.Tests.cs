@@ -60,6 +60,121 @@ namespace MagicForceClick.Tests
                 Run("configuration missing members retain defaults", delegate { WithFile("{\"EnableAcceleration\":false}", delegate(string path) {var o=ForceClickOptions.Load(path);Assert(!o.EnableAcceleration && o.EnableForceClick && o.ForceClickThreshold==180,"defaults lost");}); });
                 Run("invalid JSON rejected", delegate {WithFile("{not-json",delegate(string path){Assert(Throws(delegate{ForceClickOptions.Load(path);}),"bad JSON accepted");});});
                 Run("save is roundtrippable and replaceable", delegate {WithFile("{}",delegate(string path){var o=Options();o.EnableMonitorCompensation=false;o.Save(path);var b=ForceClickOptions.Load(path);Assert(!b.EnableMonitorCompensation && b.EnableAcceleration,"roundtrip");o.MaxGain=2.5;o.Save(path);Near(ForceClickOptions.Load(path).MaxGain,2.5);});});
+                Run("light profile leaves slow targeting nearly unchanged", delegate {
+                    var before=Options();var after=Options();after.ApplyLightCrossScreenPreset();
+                    for(double v=0;v<=1;v+=0.05)Assert(Math.Abs(PointerGain.Curve(v,after)-PointerGain.Curve(v,before))<0.04,"slow targeting changed too much");
+                });
+                Run("calibrated cross-screen curve stays moderate", delegate {
+                    var before=Options();var after=Options();after.ApplyLightCrossScreenPreset();
+                    var fast=Options();fast.MaxGain=5;fast.MidSpeed=3;fast.CurvePower=3;
+                    foreach(double v in new double[]{4.5,8,12}){
+                        Assert(PointerGain.Curve(v,after)>PointerGain.Curve(v,before)*1.05,"moderate gain did not increase");
+                        Assert(PointerGain.Curve(v,after)<PointerGain.Curve(v,fast)*0.75,"rejected fast trial returned");
+                    }
+                    after.Validate();
+                });
+                Run("light pressure still rejects ordinary calibrated clicks", delegate {
+                    var o=Options();o.ApplyLightCrossScreenPreset();
+                    foreach(int pressure in new int[]{63,70,77,85,97,98,101,113,124,137})
+                        Assert(!new PressGesture().Update(Sample(1,1000,pressure,true),0,0,0,o),"ordinary click fired at "+pressure);
+                    var p=new PressGesture();p.Update(Sample(1,1000,80,true),0,0,0,o);
+                    Assert(!p.Update(Sample(2,1000,150,true),0,0,11,o),"light press skipped stability interval");
+                    Assert(p.Update(Sample(3,1000,150,true),0,0,191,o),"stable light press did not fire");
+                });
+                Run("light profile preserves switches and drag protection", delegate {
+                    var o=Options();o.EnableForceClick=false;o.EnableMonitorCompensation=false;o.AccelerateWhilePressed=false;o.DragCancelCursorPixels=3;o.ApplyLightCrossScreenPreset();
+                    Assert(!o.EnableForceClick&&!o.EnableMonitorCompensation&&!o.AccelerateWhilePressed&&o.DragCancelCursorPixels==3&&o.DragCancelDistance==220,"profile changed unrelated setting");
+                });
+                Run("light profile does not weaken drag interlock", delegate {
+                    var o=Options();o.ApplyLightCrossScreenPreset();var p=new PressGesture();p.Update(Sample(1,1000,70,true),0,0,0,o);
+                    p.Update(Sample(2,1100,80,true),6,0,11,o);
+                    Assert(!p.Update(Sample(3,1100,253,true),6,0,22,o)&&p.Blocked,"deep drag fired");
+                });
+                Run("pressure dwell catches force before visible cursor drag", delegate {
+                    var o=Options();o.ApplyLightCrossScreenPreset();var p=new PressGesture();p.Update(Sample(1,1000,72,true),0,0,0,o);
+                    Assert(!p.Update(Sample(2,1050,155,true),0,0,66,o),"early pressure spike fired");
+                    Assert(!p.Update(Sample(3,1185,168,true),0,0,121,o),"pressure fired before drag became visible");
+                    Assert(!p.Update(Sample(4,1256,168,true),26,0,132,o)&&p.Blocked,"drag was not blocked");
+                    Assert(!p.Update(Sample(5,1300,253,true),30,0,500,o),"drag rearmed after dwell");
+                });
+                Run("pressure dip restarts stable dwell", delegate {
+                    var o=Options();o.ApplyLightCrossScreenPreset();var p=new PressGesture();
+                    p.Update(Sample(1,1000,80,true),0,0,0,o);p.Update(Sample(2,1000,95,true),0,0,10,o);
+                    p.Update(Sample(3,1000,89,true),0,0,150,o);
+                    Assert(!p.Update(Sample(4,1000,95,true),0,0,170,o),"dip did not restart dwell");
+                    Assert(!p.Update(Sample(5,1000,95,true),0,0,349,o),"dwell too short");
+                    Assert(p.Update(Sample(6,1000,95,true),0,0,350,o),"stable press not fired");
+                });
+                Run("dwell resets after full release", delegate {
+                    var o=Options();o.ApplyLightCrossScreenPreset();var p=new PressGesture();
+                    p.Update(Sample(1,1000,80,true),0,0,0,o);p.Update(Sample(2,1000,95,true),0,0,10,o);p.Update(Sample(3,1000,0,false),0,0,70,o);
+                    Assert(!p.Update(Sample(4,1000,80,true),0,0,1000,o),"previous press time leaked");
+                    Assert(!p.Update(Sample(5,1000,95,true),0,0,1010,o),"new press skipped dwell");
+                    Assert(p.Update(Sample(6,1000,95,true),0,0,1190,o),"next press did not fire");
+                });
+                Run("invalid dwell is rejected and old config stays immediate", delegate {
+                    var o=Options();Near(o.ForceClickDwellMs,0);o.ForceClickDwellMs=-1;
+                    Assert(Throws(o.Validate),"negative dwell accepted");
+                    o.ForceClickDwellMs=double.PositiveInfinity;Assert(Throws(o.Validate),"infinite dwell accepted");
+                });
+                Run("gentle pressure still requires extra force after button-down", delegate {
+                    var o=Options();o.ApplyLightCrossScreenPreset();var p=new PressGesture();
+                    Assert(!p.Update(Sample(1,1000,100,true),0,0,0,o),"initial pressure fired");
+                    Assert(!p.Update(Sample(2,1000,100,true),0,0,2000,o),"ordinary hold fired");
+                    Assert(!p.Update(Sample(3,1000,115,true),0,0,2100,o),"rise ignored dwell");
+                    Assert(p.Update(Sample(4,1000,115,true),0,0,2280,o),"extra force did not fire");
+                });
+                Run("low thresholds require stability and pressure rise", delegate {
+                    var o=Options();o.ForceClickThreshold=90;Assert(Throws(o.Validate),"unsafe low threshold accepted");
+                    o.ForceClickDwellMs=180;Assert(Throws(o.Validate),"low threshold without rise accepted");
+                    o.ForceClickPressureRise=15;o.Validate();
+                });
+                Run("gentle profile keeps deliberate hard preview immediate", delegate {
+                    var o=Options();o.ApplyLightCrossScreenPreset();var p=new PressGesture();
+                    p.Update(Sample(1,1000,80,true),0,0,0,o);
+                    Assert(p.Update(Sample(2,1000,180,true),0,0,11,o),"original hard press was delayed");
+                    Assert(!p.Update(Sample(3,1000,240,true),0,0,1000,o),"hard press repeated");
+                });
+                Run("immediate path cannot bypass a drag or pressure rise", delegate {
+                    var o=Options();o.ApplyLightCrossScreenPreset();var p=new PressGesture();
+                    p.Update(Sample(1,1000,80,true),0,0,0,o);p.Update(Sample(2,1500,80,true),20,0,11,o);
+                    Assert(!p.Update(Sample(3,1500,253,true),20,0,22,o),"immediate path bypassed drag");
+                    var held=new PressGesture();held.Update(Sample(1,1000,190,true),0,0,0,o);
+                    Assert(!held.Update(Sample(2,1000,190,true),0,0,1000,o),"immediate path bypassed rise");
+                    o.ForceClickImmediateThreshold=80;Assert(Throws(o.Validate),"immediate below normal threshold accepted");
+                });
+                Run("Opus file list routes through existing Space action", delegate {
+                    Assert(PreviewPolicy.Resolve("dopus","dopus.lister","dopus.filedisplay",false)==PreviewRoute.FocusedSpace,"Opus list not supported");
+                    Assert(PreviewPolicy.Resolve("DOPUS","dopus.lister","dopus.iconfiledisplay",false)==PreviewRoute.FocusedSpace,"Opus icons not supported");
+                });
+                Run("Opus rename address search and viewer do not receive Space", delegate {
+                    foreach(string cls in new string[]{"Edit","RICHEDIT50W","ComboBox","dopus.searchctl","dopus.viewpic","EXCEL7","dopus.lister"})
+                        Assert(PreviewPolicy.Resolve("dopus","dopus.lister",cls,false)==PreviewRoute.None,"unsafe Opus focus accepted: "+cls);
+                });
+                Run("Opus dialogs and unrelated processes are rejected", delegate {
+                    Assert(PreviewPolicy.Resolve("dopus","#32770","dopus.filedisplay",false)==PreviewRoute.None,"dialog accepted");
+                    Assert(PreviewPolicy.Resolve("other","dopus.lister","dopus.filedisplay",false)==PreviewRoute.None,"other app accepted");
+                    Assert(PreviewPolicy.Resolve("dopus","dopus.lister",null,false)==PreviewRoute.None,"missing focus accepted");
+                });
+                Run("held modifiers prevent preview routing", delegate {
+                    Assert(PreviewPolicy.Resolve("dopus","dopus.lister","dopus.filedisplay",true)==PreviewRoute.None,"modified Space accepted");
+                    Assert(PreviewPolicy.Resolve("explorer","CabinetWClass","DirectUIHWND",true)==PreviewRoute.None,"modified explorer accepted");
+                });
+                Run("Explorer desktop and QuickLook routing retained", delegate {
+                    Assert(PreviewPolicy.Resolve("explorer","CabinetWClass","DirectUIHWND",false)==PreviewRoute.QuickLook,"explorer rejected");
+                    Assert(PreviewPolicy.Resolve("explorer","WorkerW","SysListView32",false)==PreviewRoute.QuickLook,"desktop rejected");
+                    Assert(PreviewPolicy.Resolve("QuickLook","HwndWrapper[QuickLook;;test]","HwndWrapper[QuickLook;;test]",false)==PreviewRoute.QuickLook,"QuickLook rejected");
+                    Assert(PreviewPolicy.Resolve("explorer","CabinetWClass","Edit",false)==PreviewRoute.None,"explorer rename accepted");
+                });
+                Run("absolute pointer preserves every pixel on negative-origin desktop", delegate {
+                    for(int x=-1920;x<6400;x++){int normalized=AbsolutePointer.Normalize(x,-1920,8320);int decoded=(int)((long)normalized*8320/65536)-1920;Assert(decoded==x,"negative-origin pixel lost");}
+                    for(int y=0;y<2163;y++){int normalized=AbsolutePointer.Normalize(y,0,2163);Assert((int)((long)normalized*2163/65536)==y,"vertical pixel lost");}
+                });
+                Run("absolute pointer clamps out of desktop and rejects invalid extent", delegate {
+                    Assert(AbsolutePointer.Normalize(-99999,-1920,8320)==AbsolutePointer.Normalize(-1920,-1920,8320),"left clamp");
+                    Assert(AbsolutePointer.Normalize(99999,-1920,8320)==AbsolutePointer.Normalize(6399,-1920,8320),"right clamp");
+                    Assert(Throws(delegate {AbsolutePointer.Normalize(0,0,0);}),"zero extent accepted");
+                });
                 Console.WriteLine("RESULT passed=" + _passed + " failed=0"); return 0;
             }
             catch(Exception ex) { Console.Error.WriteLine("FAIL after " + _passed + ": " + ex); return 1; }

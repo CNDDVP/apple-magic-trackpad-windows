@@ -9,7 +9,7 @@ if(-not $RuntimeDir){
  else{$RuntimeDir=Join-Path $env:LOCALAPPDATA 'Programs\MagicTrackpad'}
 }
 $RuntimeDir=[IO.Path]::GetFullPath($RuntimeDir)
-$files=@('MagicForceClick.exe','MagicForceClick.cs','MagicForceClick.Core.cs','MagicForceClick.Settings.cs','MagicForceClick.json','Open_MagicTrackpad_Settings.cmd','Restore_MagicForceClick.ps1','Update_MagicForceClick.ps1')
+$files=@('MagicForceClick.exe','MagicForceClick.cs','MagicForceClick.Core.cs','MagicForceClick.Settings.cs','MagicForceClick.Preview.cs','MagicForceClick.json','Open_MagicTrackpad_Settings.cmd','Restore_MagicForceClick.ps1','Update_MagicForceClick.ps1')
 foreach($file in $files){if(-not(Test-Path -LiteralPath (Join-Path $source $file))){throw "Missing update file: $file"}}
 $newExe=Join-Path $source 'MagicForceClick.exe'
 $assembly=[Reflection.Assembly]::Load([IO.File]::ReadAllBytes($newExe))
@@ -55,10 +55,10 @@ try {
    $process=Get-Process -Name MagicForceClick -ErrorAction SilentlyContinue | Where-Object{$_.Path -eq $exe}
    $statusPath=Join-Path $RuntimeDir 'MagicForceClick.status.json'
    $status=if(Test-Path -LiteralPath $statusPath){try{Get-Content -LiteralPath $statusPath -Raw | ConvertFrom-Json}catch{$null}}else{$null}
-  }until(($process -and $status.Version -eq '1.1.0' -and $status.RawInputRegistered) -or (Get-Date) -gt $deadline)
-  if(-not($process -and $status.Version -eq '1.1.0' -and $status.RawInputRegistered)){throw 'Runtime startup verification failed.'}
+  }until(($process -and $status.Version -eq '1.1.1' -and $status.RawInputRegistered) -or (Get-Date) -gt $deadline)
+  if(-not($process -and $status.Version -eq '1.1.1' -and $status.RawInputRegistered)){throw 'Runtime startup verification failed.'}
  }
- [pscustomobject]@{Success=$true;Version='1.1.0';RuntimeDir=$RuntimeDir;SnapshotDir=$snapshot;SnapshotManifest=(Get-FileHash -LiteralPath (Join-Path $snapshot 'Snapshot.json')).Hash}
+ [pscustomobject]@{Success=$true;Version='1.1.1';RuntimeDir=$RuntimeDir;SnapshotDir=$snapshot;SnapshotManifest=(Get-FileHash -LiteralPath (Join-Path $snapshot 'Snapshot.json')).Hash}
 }catch{
  $failure=$_.Exception.Message+' at '+$_.ScriptStackTrace
  & (Join-Path $snapshot 'Restore_MagicForceClick.ps1') -SnapshotDir $snapshot -DoNotStart:$DoNotStart | Out-Null

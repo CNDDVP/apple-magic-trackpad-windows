@@ -4,7 +4,7 @@ $ErrorActionPreference='Stop'
 $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if(-not(Test-Path -LiteralPath $csc)){throw '.NET Framework 4.x x64 compiler required.'}
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
-$sources=@('MagicForceClick.cs','MagicForceClick.Core.cs','MagicForceClick.Settings.cs')|ForEach-Object{Join-Path $PSScriptRoot $_}
+$sources=@('MagicForceClick.cs','MagicForceClick.Core.cs','MagicForceClick.Settings.cs','MagicForceClick.Preview.cs')|ForEach-Object{Join-Path $PSScriptRoot $_}
 $output=Join-Path $OutputDir 'MagicForceClick.exe'
 & $csc /nologo /target:winexe /platform:anycpu /optimize+ /r:System.Windows.Forms.dll /r:System.Drawing.dll /r:System.Runtime.Serialization.dll "/out:$output" $sources
 if($LASTEXITCODE -ne 0){throw 'Runtime build failed.'}
@@ -23,5 +23,5 @@ $integrationResults=@(& $integration)
 $integrationResults | Set-Content -LiteralPath (Join-Path $OutputDir 'IntegrationResults.txt') -Encoding UTF8
 if($LASTEXITCODE -ne 0){throw 'Integration tests failed.'}
 $integrationResults | Write-Output
-[pscustomobject]@{Version='1.1.0';Time=(Get-Date -Format o);Summary=$results[-1];RuntimeSha256=(Get-FileHash -LiteralPath $output).Hash;Baseline='2594280052ed327c5a328f9b0e3d38f2ec7545ce'} |
+[pscustomobject]@{Version='1.1.1';Time=(Get-Date -Format o);Summary=$results[-1];RuntimeSha256=(Get-FileHash -LiteralPath $output).Hash;Baseline='2594280052ed327c5a328f9b0e3d38f2ec7545ce'} |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $OutputDir 'TestResults.json') -Encoding UTF8

@@ -9,8 +9,8 @@ using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32.SafeHandles;
 
-[assembly: System.Reflection.AssemblyVersion("1.1.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.1.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.1.1.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.1.1.0")]
 
 namespace MagicForceClick
 {
@@ -111,6 +111,7 @@ namespace MagicForceClick
         private bool _loggedReport, _diagnosticButtonDown;
         private int _diagnosticPeak;
         private bool _rawInputRegistered;
+        private long _pointerSubmissionFailures;
         // === 多屏 PPI 自动等速补偿 + 类 macOS S型动态加速曲线 状态 ===
         private struct MonitorScaleInfo
         {
@@ -163,7 +164,7 @@ namespace MagicForceClick
             dev[0].hwndTarget = Handle;
             bool registered = RegisterRawInputDevices(dev, 1, (uint)Marshal.SizeOf(typeof(RAWINPUTDEVICE)));
             _rawInputRegistered = registered;
-            Log("MagicForceClick 1.1.0; RawInput registration=" + registered + "; error=" + (registered ? 0 : Marshal.GetLastWin32Error()) + "; threshold=" + _options.ForceClickThreshold);
+            Log("MagicForceClick 1.1.1; RawInput registration=" + registered + "; error=" + (registered ? 0 : Marshal.GetLastWin32Error()) + "; threshold=" + _options.ForceClickThreshold);
             RefreshMonitors();
             WriteStatus();
             _configTimer = new System.Windows.Forms.Timer { Interval = 1000 };
@@ -305,11 +306,13 @@ namespace MagicForceClick
         [System.Runtime.Serialization.DataContract]
         public sealed class RuntimeStatus
         {
-            [System.Runtime.Serialization.DataMember] public string Version = "1.1.0";
+            [System.Runtime.Serialization.DataMember] public string Version = "1.1.1";
             [System.Runtime.Serialization.DataMember] public DateTime TimeUtc = DateTime.UtcNow;
             [System.Runtime.Serialization.DataMember] public long ValidScanFrames, DuplicateScanFrames, Discontinuities;
             [System.Runtime.Serialization.DataMember] public bool PressBlocked;
             [System.Runtime.Serialization.DataMember] public bool RawInputRegistered;
+            [System.Runtime.Serialization.DataMember] public string PointerOutput = "SendInputAbsoluteVirtualDesktop";
+            [System.Runtime.Serialization.DataMember] public long PointerSubmissionFailures;
             [System.Runtime.Serialization.DataMember] public ForceClickOptions Options;
         }
         private void WriteStatus()
@@ -317,7 +320,7 @@ namespace MagicForceClick
             _lastStatusTick = NowMs;
             try
             {
-                var status = new RuntimeStatus { Options = _options, ValidScanFrames = _motion.ValidFrames, DuplicateScanFrames = _motion.DuplicateFrames, Discontinuities = _motion.Discontinuities, PressBlocked = _press.Blocked, RawInputRegistered = _rawInputRegistered };
+                var status = new RuntimeStatus { Options = _options, ValidScanFrames = _motion.ValidFrames, DuplicateScanFrames = _motion.DuplicateFrames, Discontinuities = _motion.Discontinuities, PressBlocked = _press.Blocked, RawInputRegistered = _rawInputRegistered, PointerSubmissionFailures = _pointerSubmissionFailures };
                 string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "MagicForceClick.status.json");
                 string temp = path + ".tmp";
                 using (var stream = File.Create(temp)) new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(RuntimeStatus)).WriteObject(stream, status);
@@ -415,6 +418,7 @@ namespace MagicForceClick
             double now = NowMs;
             MotionResult motion = _motion.Update(sample, now, options);
             if (motion.ContinuityLost) { _press.CancelHeld(); Interlocked.Increment(ref _previewEpoch); }
+            bool wasBlocked = _press.Blocked;
             bool preview = _press.Update(sample, position.X, position.Y, now, options);
             if (!sample.Button || _press.Blocked) Interlocked.Increment(ref _previewEpoch);
 
@@ -428,7 +432,7 @@ namespace MagicForceClick
                     int applyX = (int)Math.Round(targetX), applyY = (int)Math.Round(targetY);
                     _remX = targetX - applyX; _remY = targetY - applyY;
                     int x = _lastSetPos.X + applyX, y = _lastSetPos.Y + applyY;
-                    if (x != position.X || y != position.Y) { SetCursorPos(x, y); GetCursorPos(out position); }
+                    if (x != position.X || y != position.Y) MovePointerThroughInput(x, y, ref position);
                 }
             }
             else { _remX = _remY = 0; }
@@ -436,7 +440,7 @@ namespace MagicForceClick
 
             if (sample.Button && !_diagnosticButtonDown) { _diagnosticPeak = sample.Pressure; Log("ButtonDown pressure=" + sample.Pressure); }
             if (sample.Button) _diagnosticPeak = Math.Max(_diagnosticPeak, sample.Pressure);
-            if (!sample.Button && _diagnosticButtonDown) Log("ButtonUp peak=" + _diagnosticPeak + "; previewBlocked=" + _press.Blocked);
+            if (!sample.Button && _diagnosticButtonDown) Log("ButtonUp peak=" + _diagnosticPeak + "; previewBlocked=" + wasBlocked);
             _diagnosticButtonDown = sample.Button;
             if (now - _lastDiagnosticTick >= 1000 && sample.ContactCount > 0)
             {
@@ -445,6 +449,7 @@ namespace MagicForceClick
             }
             if (preview)
             {
+                Log("Preview intent; pressure=" + sample.Pressure + "; threshold=" + options.ForceClickThreshold + "; rise=" + options.ForceClickPressureRise + "; dwellMs=" + options.ForceClickDwellMs);
                 IntPtr hwnd = GetForegroundWindow();
                 int token = Interlocked.Increment(ref _previewEpoch);
                 ThreadPool.QueueUserWorkItem(delegate { TriggerStage2ForceClick(hwnd, token); });
@@ -454,28 +459,66 @@ namespace MagicForceClick
         {
             return token == Volatile.Read(ref _previewEpoch) && _options.EnableForceClick && hwnd != IntPtr.Zero && GetForegroundWindow() == hwnd;
         }
+
+        private void MovePointerThroughInput(int x, int y, ref POINT position)
+        {
+            // Keep the target on a real display, including gaps in staggered monitor layouts.
+            double best = double.MaxValue;
+            int targetX = x, targetY = y;
+            foreach (var monitor in _monitors)
+            {
+                int cx = Math.Max(monitor.Left, Math.Min(monitor.Right - 1, x));
+                int cy = Math.Max(monitor.Top, Math.Min(monitor.Bottom - 1, y));
+                double distance = (double)(x - cx) * (x - cx) + (double)(y - cy) * (y - cy);
+                if (distance < best) { best = distance; targetX = cx; targetY = cy; }
+            }
+            RECT clip;
+            if (GetClipCursor(out clip) && clip.Right > clip.Left && clip.Bottom > clip.Top)
+            {
+                targetX = Math.Max(clip.Left, Math.Min(clip.Right - 1, targetX));
+                targetY = Math.Max(clip.Top, Math.Min(clip.Bottom - 1, targetY));
+            }
+            int width = GetSystemMetrics(78), height = GetSystemMetrics(79);
+            if (width <= 0 || height <= 0) return;
+            var input = new INPUT[1];
+            input[0].type = 0;
+            input[0].mouse.dx = AbsolutePointer.Normalize(targetX, GetSystemMetrics(76), width);
+            input[0].mouse.dy = AbsolutePointer.Normalize(targetY, GetSystemMetrics(77), height);
+            input[0].mouse.dwFlags = 0x0001 | 0x8000 | 0x4000 | 0x2000;
+            // Submit via the Windows input path, not SetCursorPos: subsequent PTP motion must
+            // inherit the injected position. Track the submitted target, never a stale immediate read.
+            if (SendInput(1, input, Marshal.SizeOf(typeof(INPUT))) == 1)
+            { position.X = targetX; position.Y = targetY; }
+            else
+            {
+                _pointerSubmissionFailures++;
+                _motion.Reset(); _remX = _remY = 0;
+                if (_pointerSubmissionFailures == 1) Log("Pointer input submission failed; error=" + Marshal.GetLastWin32Error());
+            }
+        }
         private void TriggerStage2ForceClick(IntPtr hwnd, int token)
         {
-            if (!PreviewCurrent(hwnd, token) || !IsFileManagerOrPreviewWindow(GetForegroundWindowClass())) return;
-            Log("Stage2 threshold reached; drag interlock passed");
+            if (!PreviewCurrent(hwnd, token)) return;
+            PreviewContext context = PreviewContext.Capture(hwnd);
+            if (context.Route == PreviewRoute.None)
+            {
+                Log("Stage2 ignored outside supported file view; process=" + context.ProcessName + "; windowClass=" + context.WindowClass + "; focusClass=" + context.FocusClass);
+                return;
+            }
+            Log("Stage2 threshold reached; drag interlock passed; route=" + context.Route);
             mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, UIntPtr.Zero);
             Thread.Sleep(25);
-            if (!PreviewCurrent(hwnd, token)) return;
-            if (!TryInvokeQuickLookPipe(hwnd, token) && PreviewCurrent(hwnd, token)) SendKey(VK_SPACE);
+            if (!PreviewCurrent(hwnd, token) || !context.StillCurrent()) return;
+            if (context.Route == PreviewRoute.FocusedSpace)
+            {
+                SendKey(VK_SPACE);
+                Log("Directory Opus preview Space sent to focused file display");
+                return;
+            }
+            if (!TryInvokeQuickLookPipe(context, token) && PreviewCurrent(hwnd, token) && context.StillCurrent()) SendKey(VK_SPACE);
         }
 
-        private static bool IsFileManagerOrPreviewWindow(string cls)
-        {
-            if (string.IsNullOrEmpty(cls)) return false;
-            return cls == "CabinetWClass"
-                || cls == "ExploreWClass"
-                || cls == "Progman"
-                || cls == "WorkerW"
-                || cls.Contains("QuickLook")
-                || cls.StartsWith("HwndWrapper[QuickLook");
-        }
-
-        private bool TryInvokeQuickLookPipe(IntPtr hwnd, int token)
+        private bool TryInvokeQuickLookPipe(PreviewContext context, int token)
         {
             try
             {
@@ -483,7 +526,7 @@ namespace MagicForceClick
                 using (var pipe = new NamedPipeClientStream(".", pipeName, PipeDirection.Out))
                 {
                     pipe.Connect(250);
-                    if (!PreviewCurrent(hwnd, token)) return true;
+                    if (!PreviewCurrent(context.Window, token) || !context.StillCurrent()) return true;
                     using (var writer = new StreamWriter(pipe))
                     {
                         writer.WriteLine("QuickLook.App.PipeMessages.Toggle||");
@@ -560,6 +603,11 @@ namespace MagicForceClick
             public int Y;
         }
 
+        [StructLayout(LayoutKind.Sequential)] private struct RECT { public int Left, Top, Right, Bottom; }
+        [StructLayout(LayoutKind.Sequential)] private struct MOUSEINPUT
+        { public int dx, dy; public uint mouseData, dwFlags, time; public UIntPtr extraInfo; }
+        [StructLayout(LayoutKind.Sequential)] private struct INPUT { public uint type; public MOUSEINPUT mouse; }
+
         [StructLayout(LayoutKind.Sequential)]
         private struct DEVMODE
         {
@@ -599,8 +647,14 @@ namespace MagicForceClick
         [DllImport("user32.dll")]
         private static extern bool GetCursorPos(out POINT lpPoint);
 
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern uint SendInput(uint count, INPUT[] inputs, int size);
+
         [DllImport("user32.dll")]
-        private static extern bool SetCursorPos(int X, int Y);
+        private static extern int GetSystemMetrics(int index);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetClipCursor(out RECT clip);
 
         [DllImport("user32.dll")]
         private static extern bool EnumDisplaySettings(string lpszDeviceName, int iModeNum, ref DEVMODE lpDevMode);

@@ -15,6 +15,9 @@ namespace MagicForceClick
         [DataMember] public bool EnableMonitorCompensation;
         [DataMember] public bool AccelerateWhilePressed;
         [DataMember] public int ForceClickThreshold;
+        [DataMember] public double ForceClickDwellMs;
+        [DataMember] public int ForceClickPressureRise;
+        [DataMember] public int ForceClickImmediateThreshold;
         [DataMember] public int DragCancelDistance;
         [DataMember] public int DragCancelCursorPixels;
         [DataMember] public double MinGain;
@@ -31,16 +34,32 @@ namespace MagicForceClick
         {
             SchemaVersion = 1;
             EnableForceClick = EnableAcceleration = EnableMonitorCompensation = AccelerateWhilePressed = true;
-            ForceClickThreshold = 180; DragCancelDistance = 220; DragCancelCursorPixels = 4;
+            ForceClickThreshold = 180; ForceClickDwellMs = 0; ForceClickPressureRise = 0; ForceClickImmediateThreshold = 0; DragCancelDistance = 220; DragCancelCursorPixels = 4;
             MinGain = 0.95; MaxGain = 3.40; MidSpeed = 4.5; CurvePower = 1.85;
             // Equivalent to the previous 0.55 EMA at an 8 ms frame period.
             SpeedSmoothingMs = -8.0 / Math.Log(0.45);
             MaxFrameIntervalMs = 65; IdleResetMs = 250;
         }
+        public void ApplyLightCrossScreenPreset()
+        {
+            // Optional calibrated profile. Preserve switches and drag protection.
+            ForceClickThreshold = 90;
+            ForceClickDwellMs = 180;
+            ForceClickPressureRise = 15;
+            ForceClickImmediateThreshold = 180;
+            MinGain = 0.95; MaxGain = 3.5; MidSpeed = 3.8; CurvePower = 2.0;
+        }
         public void Validate()
         {
             if (SchemaVersion != 1) throw new InvalidDataException("Unsupported configuration schema.");
-            Range(ForceClickThreshold, 120, 250, "ForceClickThreshold");
+            Range(ForceClickThreshold, 70, 250, "ForceClickThreshold");
+            Range(ForceClickDwellMs, 0, 500, "ForceClickDwellMs");
+            Range(ForceClickPressureRise, 0, 100, "ForceClickPressureRise");
+            Range(ForceClickImmediateThreshold, 0, 250, "ForceClickImmediateThreshold");
+            if (ForceClickImmediateThreshold != 0 && ForceClickImmediateThreshold < ForceClickThreshold)
+                throw new InvalidDataException("Immediate pressure must be zero or at least the normal pressure threshold.");
+            if (ForceClickThreshold < 120 && (ForceClickDwellMs < 120 || ForceClickPressureRise < 10))
+                throw new InvalidDataException("Pressure below 120 requires at least 120 ms dwell and 10 pressure rise after button-down.");
             Range(DragCancelDistance, 10, 2000, "DragCancelDistance");
             Range(DragCancelCursorPixels, 1, 64, "DragCancelCursorPixels");
             Range(MinGain, 0.1, 8, "MinGain"); Range(MaxGain, MinGain, 8, "MaxGain");
@@ -77,6 +96,31 @@ namespace MagicForceClick
                 else File.Move(temp, path);
             }
             finally { if (File.Exists(temp)) File.Delete(temp); }
+        }
+    }
+
+    public enum PreviewRoute { None, QuickLook, FocusedSpace }
+    public static class PreviewPolicy
+    {
+        public static PreviewRoute Resolve(string processName, string windowClass, string focusClass, bool modifiersHeld)
+        {
+            if (modifiersHeld || string.IsNullOrEmpty(windowClass) || string.IsNullOrEmpty(focusClass)) return PreviewRoute.None;
+            // Renaming, address bars and text viewers must never receive a synthetic Space.
+            if (focusClass.Equals("Edit", StringComparison.OrdinalIgnoreCase)
+                || focusClass.StartsWith("RichEdit", StringComparison.OrdinalIgnoreCase)
+                || focusClass.StartsWith("WindowsForms10.EDIT", StringComparison.OrdinalIgnoreCase)
+                || focusClass.Equals("Scintilla", StringComparison.OrdinalIgnoreCase)) return PreviewRoute.None;
+            if (string.Equals(processName, "dopus", StringComparison.OrdinalIgnoreCase)
+                && windowClass == "dopus.lister")
+                return focusClass == "dopus.filedisplay" || focusClass == "dopus.iconfiledisplay"
+                    ? PreviewRoute.FocusedSpace : PreviewRoute.None;
+            if (string.Equals(processName, "explorer", StringComparison.OrdinalIgnoreCase)
+                && (windowClass == "CabinetWClass" || windowClass == "ExploreWClass" || windowClass == "Progman" || windowClass == "WorkerW"))
+                return PreviewRoute.QuickLook;
+            if (string.Equals(processName, "QuickLook", StringComparison.OrdinalIgnoreCase)
+                && (windowClass.Contains("QuickLook") || windowClass.StartsWith("HwndWrapper[QuickLook")))
+                return PreviewRoute.QuickLook;
+            return PreviewRoute.None;
         }
     }
 
@@ -145,9 +189,10 @@ namespace MagicForceClick
     public sealed class PressGesture
     {
         private bool _pressed, _blocked, _fired;
-        private int _x, _y, _cursorX, _cursorY;
+        private int _x, _y, _cursorX, _cursorY, _downPressure;
         private uint _contact;
         private double _lastFire = double.NegativeInfinity;
+        private double _thresholdSince = double.NaN;
         public bool Blocked { get { return _blocked; } }
         public bool Held { get { return _pressed; } }
         public void CancelHeld() { if (_pressed) _blocked = true; }
@@ -156,12 +201,15 @@ namespace MagicForceClick
             if (!sample.Button)
             {
                 _pressed = _blocked = _fired = false;
+                _thresholdSince = double.NaN;
                 return false;
             }
             if (!_pressed)
             {
                 _pressed = true; _blocked = _fired = false;
+                _thresholdSince = double.NaN;
                 _x = sample.X; _y = sample.Y; _cursorX = cursorX; _cursorY = cursorY; _contact = sample.ContactId;
+                _downPressure = sample.Pressure;
             }
             // Anchor at physical button-down, including pressures BELOW 110. Latch until release.
             if (sample.ContactCount != 1 || !sample.Tip || sample.ContactId != _contact
@@ -171,7 +219,14 @@ namespace MagicForceClick
                 || Math.Abs(cursorY - _cursorY) > options.DragCancelCursorPixels)
                 _blocked = true;
             if (!options.EnableForceClick) _blocked = true;
-            if (_blocked || _fired || sample.Pressure < options.ForceClickThreshold || nowMs - _lastFire < 450)
+            if (sample.Pressure < Math.Max(options.ForceClickThreshold, _downPressure + options.ForceClickPressureRise))
+            {
+                _thresholdSince = double.NaN;
+                return false;
+            }
+            if (double.IsNaN(_thresholdSince)) _thresholdSince = nowMs;
+            bool immediate = options.ForceClickImmediateThreshold > 0 && sample.Pressure >= options.ForceClickImmediateThreshold;
+            if (_blocked || _fired || (!immediate && nowMs - _thresholdSince < options.ForceClickDwellMs) || nowMs - _lastFire < 450)
                 return false;
             _fired = true; _lastFire = nowMs;
             return true;
@@ -190,6 +245,17 @@ namespace MagicForceClick
         {
             double curve = options.EnableAcceleration && (!pressed || options.AccelerateWhilePressed) ? Curve(speed, options) : 1;
             return curve * (options.EnableMonitorCompensation ? monitorScale : 1);
+        }
+    }
+
+    public static class AbsolutePointer
+    {
+        public static int Normalize(int pixel, int origin, int extent)
+        {
+            if (extent <= 0) throw new ArgumentOutOfRangeException("extent");
+            long offset = Math.Max(0L, Math.Min((long)extent - 1, (long)pixel - origin));
+            // SendInput maps 0..65535 over the entire virtual desktop. Aim at the pixel center.
+            return (int)Math.Min(65535L, ((2 * offset + 1) * 65536L) / (2L * extent));
         }
     }
 }

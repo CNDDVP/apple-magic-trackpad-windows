@@ -1,13 +1,16 @@
 name: Package release assets
 on:
+  push:
+    branches: [main]
+    paths: [RELEASE_VERSION]
   release:
     types: [published]
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag to package
+        description: Release tag to verify and publish
         required: true
-        default: v1.1.0
+        default: v1.1.1
 permissions:
   contents: read
 jobs:
@@ -19,17 +22,35 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.sha }}
+      - name: Resolve and validate release version
+        shell: pwsh
+        env:
+          REQUESTED_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          $version = (Get-Content -LiteralPath RELEASE_VERSION -Raw).Trim()
+          $tag = $env:REQUESTED_TAG
+          if (-not $tag) { $tag = $version }
+          if ($tag -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$' -or $tag -ne $version) { throw 'Invalid or mismatched release version.' }
+          "RELEASE_TAG=$tag" >> $env:GITHUB_ENV
       - name: Build and run behavior and integration tests
         shell: powershell
         run: .\Build.ps1
       - name: Verify checksums and build release packages
         run: python tools/Package_Release.py
-      - name: Upload assets to the existing release
+      - name: Publish verified release and upload assets
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
-          gh release upload $env:RELEASE_TAG artifacts/release/* --repo $env:GITHUB_REPOSITORY
+          $assets = Join-Path 'artifacts/release' $env:RELEASE_TAG
+          $notes = 'RELEASE_NOTES_' + $env:RELEASE_TAG + '.md'
+          if (-not (Test-Path -LiteralPath $notes)) { throw 'Release notes missing.' }
+          if (-not (Test-Path -LiteralPath (Join-Path $assets ('MagicForceClick-' + $env:RELEASE_TAG + '-update.zip')))) { throw 'Verified update package missing.' }
+          gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title ('Magic Trackpad Windows ' + $env:RELEASE_TAG) --notes-file $notes --latest
+            if ($LASTEXITCODE -ne 0) { throw 'Release creation failed.' }
+          }
+          gh release upload $env:RELEASE_TAG "$assets/*" --repo $env:GITHUB_REPOSITORY
           if ($LASTEXITCODE -ne 0) { throw 'Release upload failed.' }

@@ -4,7 +4,9 @@ import hashlib,json,subprocess,zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
 BASELINE='2594280052ed327c5a328f9b0e3d38f2ec7545ce'
-OUT=ROOT/'artifacts'/'release'
+PREVIOUS='fc364b2d53f9a177f2e366ab8d639506298cb283'
+VERSION=(ROOT/'RELEASE_VERSION').read_text(encoding='ascii').strip().removeprefix('v')
+OUT=ROOT/'artifacts'/'release'/('v'+VERSION)
 OUT.mkdir(parents=True,exist_ok=True)
 def sha(data):return hashlib.sha256(data).hexdigest().upper()
 def file_sha(path):
@@ -21,8 +23,8 @@ for item in json.loads((ROOT/'SHA256SUMS.json').read_text(encoding='utf-8-sig'))
     path=ROOT/item['Path']
     if path.stat().st_size!=item['Bytes'] or file_sha(path)!=item['SHA256']:
         raise RuntimeError('Package verification failed: '+item['Path'])
-update=['MagicForceClick.exe','MagicForceClick.cs','MagicForceClick.Core.cs','MagicForceClick.Settings.cs','MagicForceClick.json','Open_MagicTrackpad_Settings.cmd','Update_MagicForceClick.ps1','Restore_MagicForceClick.ps1','README.md','RELEASE_NOTES_v1.1.0.md','TEST_REPORT_v1.1.0.md']
-with zipfile.ZipFile(OUT/'MagicForceClick-v1.1.0-update.zip','w',zipfile.ZIP_DEFLATED) as z:
+update=['MagicForceClick.exe','MagicForceClick.cs','MagicForceClick.Core.cs','MagicForceClick.Settings.cs','MagicForceClick.Preview.cs','MagicForceClick.json','Open_MagicTrackpad_Settings.cmd','Update_MagicForceClick.ps1','Restore_MagicForceClick.ps1','README.md','RELEASE_NOTES_v'+VERSION+'.md','TEST_REPORT_v'+VERSION+'.md']
+with zipfile.ZipFile(OUT/('MagicForceClick-v'+VERSION+'-update.zip'),'w',zipfile.ZIP_DEFLATED) as z:
     for name in update:z.write(ROOT/name,name)
 with zipfile.ZipFile(OUT/'MagicForceClick-baseline-2594280.zip','w',zipfile.ZIP_DEFLATED) as z:
     for name in ['MagicForceClick.cs','MagicForceClick.exe']:
@@ -30,7 +32,13 @@ with zipfile.ZipFile(OUT/'MagicForceClick-baseline-2594280.zip','w',zipfile.ZIP_
         if name.endswith('.exe') and sha(data)!='FC0BB943B15A6F0397EAE54CB702151D75D5B36A267ADC158280A829189358A4':raise RuntimeError('Baseline binary mismatch')
         z.writestr(name,data)
     z.writestr('BASELINE.txt','Baseline '+BASELINE+'\nKeep your upgrade snapshot to restore personal settings and startup.\n')
-with zipfile.ZipFile(OUT/'Apple-Magic-Trackpad-Windows-v1.1.0-full.zip','w',zipfile.ZIP_DEFLATED) as z:
+with zipfile.ZipFile(OUT/'MagicForceClick-v1.1.0-rollback.zip','w',zipfile.ZIP_DEFLATED) as z:
+    for name in ['MagicForceClick.exe','MagicForceClick.cs','MagicForceClick.Core.cs','MagicForceClick.Settings.cs','MagicForceClick.json','Open_MagicTrackpad_Settings.cmd','Update_MagicForceClick.ps1','Restore_MagicForceClick.ps1']:
+        data=subprocess.check_output(['git','-C',str(ROOT),'show',PREVIOUS+':'+name])
+        if name.endswith('.exe') and sha(data)!='E2999F555030389922EBF1AA2EB81A7F7AFF66CDE6E3D0060DDF2208835BF697':raise RuntimeError('v1.1.0 binary mismatch')
+        z.writestr(name,data)
+    z.writestr('BASELINE.txt','v1.1.0 '+PREVIOUS+'\nUse your local snapshot to restore personal settings and startup exactly.\n')
+with zipfile.ZipFile(OUT/('Apple-Magic-Trackpad-Windows-v'+VERSION+'-full.zip'),'w',zipfile.ZIP_DEFLATED) as z:
     for name in names:z.write(ROOT/name,name)
     for filename in ['TestResults.txt','IntegrationResults.txt']:
         z.write(ROOT/'artifacts'/filename,'SELFTEST/'+filename)

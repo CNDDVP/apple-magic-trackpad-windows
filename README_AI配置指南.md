@@ -126,4 +126,14 @@ AutoFix仅对当前存在的目标Apple设备应用维护。MI_00只在实际Pro
 
 更新前必须保留SnapshotDir输出。回退使用该目录独立Restore_MagicForceClick.ps1，可恢复原文件字节、原启动项，并移除新增文件。不要删除回退快照。完整源代码基线提交2594280052ed327c5a328f9b0e3d38f2ec7545ce；当前工具版本1.1.0与驱动v2.2是不同版本体系。
 
-当前生效配置和计时统计读取MagicForceClick.status.json；设置窗口通过Open_MagicTrackpad_Settings.cmd打开。无效JSON保留运行中的上一份有效配置。Build.ps1运行39项纯逻辑与4项集成测试，另有5项更新回退测试；软件测试和用户真实手势验收必须分开报告。
+当前生效配置和计时统计读取MagicForceClick.status.json；设置窗口通过Open_MagicTrackpad_Settings.cmd打开。无效JSON保留运行中的上一份有效配置。1.1.0的Build.ps1运行39项纯逻辑与4项集成测试，另有5项更新回退测试；软件测试和用户真实手势验收必须分开报告。
+
+## 工具套件1.1.1：最终校准与防回跳
+
+新增MagicForceClick.Preview.cs，编译、完整安装和独立升级都必须包含它。Opus仅在dopus.exe、dopus.lister窗口、dopus.filedisplay/dopus.iconfiledisplay焦点中转发已有Space预览，发送前复核窗口/焦点/修饰键；不向输入框、预览器、对话框发空格。
+
+最终“轻压跨屏”预设：ForceClickThreshold=90、ForceClickDwellMs=180、ForceClickPressureRise=15、ForceClickImmediateThreshold=180；MinGain=0.95、MaxGain=3.5、MidSpeed=3.8、CurvePower=2.0。普通按下后仍需增加一点力度，不是长按即预览。双路径都受原拖动互斥保护。低于120的阈值必须配合至少120ms稳定判断和10的额外力度，不能只降低压力值。
+
+多屏补偿经Windows SendInput绝对虚拟桌面坐标提交，处理负坐标、屏幕空隙和裁剪；跟踪提交的目标，不立即用旧GetCursorPos读数回写起点。修复了快甩后下一次移动回原屏幕的问题。59项行为、5项集成、5项更新回退测试通过；实际压力回放2810+1322帧、快甩前后2080/2028帧验证。用户已确认预览省力、普通点击/拖动正常、无跨屏回跳，最终速度和定位合适。USB和睡眠恢复仍需另行实测。
+
+升级保留已有JSON。选择设置面板“轻压跨屏”并保存，或新机完整安装时用 -LightCrossScreen；不要同时传入 -ForceClickThreshold。默认值保留180/0ms/原曲线；现有JSON未显式指定压力时不被完整安装覆盖。发布前的1.1.0和2594280基线都保留，个人SnapshotDir不能删除。

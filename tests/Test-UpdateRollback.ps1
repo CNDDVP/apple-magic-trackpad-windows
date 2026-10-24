@@ -17,6 +17,7 @@ $passed++; 'PASS isolated update'
 & (Join-Path $repo 'Restore_MagicForceClick.ps1') -SnapshotDir $update.SnapshotDir -DoNotStart | Out-Null
 Assert ((Get-FileHash -LiteralPath (Join-Path $fixture 'MagicForceClick.exe')).Hash -eq $baselineHash) 'Baseline executable was not restored exactly'
 Assert (-not(Test-Path -LiteralPath (Join-Path $fixture 'MagicForceClick.Core.cs'))) 'New file remained after rollback'
+Assert (-not(Test-Path -LiteralPath (Join-Path $fixture 'MagicForceClick.Preview.cs'))) 'New Opus preview file remained after rollback'
 Assert (-not(Test-Path -LiteralPath (Join-Path $fixture 'MagicForceClick.json'))) 'New configuration remained after rollback'
 $passed++; 'PASS rollback restores exact hash and removes new files'
 $saved=Join-Path $update.SnapshotDir 'files\MagicForceClick.exe'

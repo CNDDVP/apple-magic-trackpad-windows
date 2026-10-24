@@ -36,10 +36,16 @@ namespace MagicForceClick.Tests
                 {
                     int checks=0,numbers=0;
                     Count(settings,ref checks,ref numbers);
-                    if(checks!=4||numbers!=6)throw new Exception("Settings controls missing.");
-                    Console.WriteLine("PASS settings panel has four independent switches and six adjustments");
+                    if(checks!=4||numbers!=9)throw new Exception("Settings controls missing.");
+                    Console.WriteLine("PASS settings panel has four independent switches and nine adjustments");
                 }
-                Console.WriteLine("RESULT integration_passed=4 failed=0");return 0;
+                var input=typeof(RawInputSinkForm).GetNestedType("INPUT",BindingFlags.NonPublic);
+                var mouse=typeof(RawInputSinkForm).GetNestedType("MOUSEINPUT",BindingFlags.NonPublic);
+                if(System.Runtime.InteropServices.Marshal.SizeOf(input)!=(IntPtr.Size==8?40:28)
+                    ||System.Runtime.InteropServices.Marshal.OffsetOf(input,"mouse").ToInt32()!=(IntPtr.Size==8?8:4)
+                    ||System.Runtime.InteropServices.Marshal.SizeOf(mouse)!=(IntPtr.Size==8?32:24))throw new Exception("SendInput ABI layout mismatch.");
+                Console.WriteLine("PASS absolute virtual desktop input has the Windows native INPUT ABI without injecting events");
+                Console.WriteLine("RESULT integration_passed=5 failed=0");return 0;
             }
             catch(Exception ex){Console.Error.WriteLine(ex);return 1;}
             finally {if(File.Exists(path))File.Delete(path);}
