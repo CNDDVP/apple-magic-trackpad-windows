@@ -31,6 +31,12 @@ powershell -ExecutionPolicy Bypass -File .\Build-ControlCenter.ps1
 
 独立控制中心面向 Windows 11 / .NET Framework 4.8，日常启动和设置不依赖 WSL、浏览器或额外 SDK。
 
+### 应用图标
+
+图标沿用界面的绿白配色，以银白妙控板和滑动轨迹表示触控操作。可编辑源文件位于 `docs/assets/control-center-icon.svg`，配套 PNG 为 1024 像素；`MagicControlCenter/MagicControlCenter.ico` 包含 16 至 256 像素的 10 档尺寸。
+
+构建脚本将 ICO 嵌入程序，窗口标题栏与任务栏从程序读取同一图标。桌面快捷方式使用随程序部署的 ICO 文件；升级快照会保存和恢复原有快捷方式及图标文件。
+
 ### 真实桌面验收
 
 ```powershell

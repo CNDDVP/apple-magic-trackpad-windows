@@ -9,9 +9,12 @@ $sources=@('MagicControlCenter.Assembly.cs','MagicForceClick.Core.cs','MagicCont
 $app=Join-Path $OutputDir 'MagicControlCenter.exe'
 $manifest=Join-Path $PSScriptRoot 'MagicControlCenter.manifest'
 $config=Join-Path $PSScriptRoot 'MagicControlCenter.exe.config'
-& $csc /nologo /codepage:65001 /target:winexe /platform:anycpu /optimize+ "/win32manifest:$manifest" /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Runtime.Serialization.dll /r:System.Web.Extensions.dll "/out:$app" $sources
+$icon=Join-Path $PSScriptRoot 'MagicControlCenter\MagicControlCenter.ico'
+if(-not(Test-Path -LiteralPath $icon -PathType Leaf)){throw 'Control center icon is missing.'}
+& $csc /nologo /codepage:65001 /target:winexe /platform:anycpu /optimize+ "/win32manifest:$manifest" "/win32icon:$icon" /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Runtime.Serialization.dll /r:System.Web.Extensions.dll "/out:$app" $sources
 if($LASTEXITCODE -ne 0){throw 'Control center build failed.'}
 Copy-Item -LiteralPath $config -Destination ($app+'.config') -Force
+Copy-Item -LiteralPath $icon -Destination (Join-Path $OutputDir 'MagicControlCenter.ico') -Force
 $unit=Join-Path $OutputDir 'MagicControlCenter.Tests.exe'
 & $csc /nologo /codepage:65001 /target:exe /platform:anycpu /optimize+ /r:System.dll /r:System.Runtime.Serialization.dll /r:System.Web.Extensions.dll "/out:$unit" (Join-Path $PSScriptRoot 'MagicForceClick.Core.cs') (Join-Path $PSScriptRoot 'MagicControlCenter.Core.cs') (Join-Path $PSScriptRoot 'MagicControlCenter.Platform.cs') (Join-Path $PSScriptRoot 'tests\MagicControlCenter.Tests.cs')
 if($LASTEXITCODE -ne 0){throw 'Control center test build failed.'}
@@ -20,11 +23,11 @@ $unitResults | Set-Content -LiteralPath (Join-Path $OutputDir 'ControlCenterResu
 $unitResults | Write-Output
 if($LASTEXITCODE -ne 0){throw 'Control center behavior tests failed.'}
 $ui=Join-Path $OutputDir 'MagicControlCenter.UiTests.exe'
-& $csc /nologo /codepage:65001 /target:exe /main:MagicControlCenter.Tests.WindowSmokeTests /platform:anycpu /optimize+ "/win32manifest:$manifest" /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Runtime.Serialization.dll /r:System.Web.Extensions.dll "/out:$ui" $sources (Join-Path $PSScriptRoot 'tests\MagicControlCenter.UiTests.cs')
+& $csc /nologo /codepage:65001 /target:exe /main:MagicControlCenter.Tests.WindowSmokeTests /platform:anycpu /optimize+ "/win32manifest:$manifest" "/win32icon:$icon" /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Runtime.Serialization.dll /r:System.Web.Extensions.dll "/out:$ui" $sources (Join-Path $PSScriptRoot 'tests\MagicControlCenter.UiTests.cs')
 if($LASTEXITCODE -ne 0){throw 'Control center UI test build failed.'}
 Copy-Item -LiteralPath $config -Destination ($ui+'.config') -Force
 $live=Join-Path $OutputDir 'MagicControlCenter.LiveTests.exe'
-& $csc /nologo /codepage:65001 /target:exe /main:MagicControlCenter.Tests.LiveTests /platform:anycpu /optimize+ "/win32manifest:$manifest" /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Runtime.Serialization.dll /r:System.Web.Extensions.dll "/out:$live" $sources (Join-Path $PSScriptRoot 'tests\MagicControlCenter.LiveTests.cs')
+& $csc /nologo /codepage:65001 /target:exe /main:MagicControlCenter.Tests.LiveTests /platform:anycpu /optimize+ "/win32manifest:$manifest" "/win32icon:$icon" /r:System.dll /r:System.Drawing.dll /r:System.Windows.Forms.dll /r:System.Runtime.Serialization.dll /r:System.Web.Extensions.dll "/out:$live" $sources (Join-Path $PSScriptRoot 'tests\MagicControlCenter.LiveTests.cs')
 if($LASTEXITCODE -ne 0){throw 'Control center live test build failed.'}
 Copy-Item -LiteralPath $config -Destination ($live+'.config') -Force
 # GUI checks need the real interactive Windows desktop, with its actual DPI.

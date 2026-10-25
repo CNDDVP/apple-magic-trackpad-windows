@@ -22,6 +22,7 @@ if((Get-FileHash -LiteralPath ($app+'.config')).Hash -ne (Get-FileHash -LiteralP
 $fileMap=@{}
 $fileMap['MagicControlCenter.exe']=$app
 $fileMap['MagicControlCenter.exe.config']=$app+'.config'
+$fileMap['MagicControlCenter.ico']=Join-Path $BuildDirectory 'MagicControlCenter.ico'
 foreach($file in @('MagicControlCenter.Tests.exe','MagicControlCenter.LiveTests.exe','MagicControlCenter.LiveTests.exe.config','ControlCenterResults.txt','ControlCenterBuild.json')){$fileMap[$file]=Join-Path $BuildDirectory $file}
 foreach($file in @('Run.json','UiResults.txt','UiTestLog.txt')){$fileMap['acceptance\'+$file]=Join-Path $AcceptanceDirectory $file}
 foreach($file in @('MagicControlCenter.Assembly.cs','MagicForceClick.Core.cs','MagicControlCenter.Core.cs','MagicControlCenter.Platform.cs','MagicControlCenter.Window.cs','MagicControlCenter.manifest','Build-ControlCenter.ps1','MAGIC_CONTROL_CENTER.md','tests\MagicControlCenter.Tests.cs','tests\MagicControlCenter.UiTests.cs','tests\MagicControlCenter.LiveTests.cs','tools\Test-ControlCenter.ps1')){$fileMap[$file]=Join-Path $sourceRoot $file}

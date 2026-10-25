@@ -57,6 +57,7 @@ namespace MagicForceClick
         private string _fingerprint, _page = "overview";
         private bool _loading, _nativeAvailable, _saving, _awaitingReload, _nativeDirty;
         private bool _disposed;
+        private readonly Icon _applicationIcon;
         private bool _saveFailed;
         private float _dpiScale = 1f;
         private DateTime _savedAt;
@@ -89,6 +90,8 @@ namespace MagicForceClick
             _statusPath = Path.Combine(_directory, "MagicForceClick.status.json");
             _isolated = isolated;
             Text = "Magic Trackpad · 控制中心";
+            _applicationIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+            Icon = _applicationIcon;
             ClientSize = new Size(1140, 760);
             MinimumSize = new Size(920, 650);
             StartPosition = FormStartPosition.CenterScreen;
@@ -679,6 +682,7 @@ namespace MagicForceClick
                 if (!_disposed) {
                     DetachForDisposal();
                     _runtimeLabel.Dispose(); _deviceLabel.Dispose(); _profileLabel.Dispose();
+                    if (_applicationIcon != null) _applicationIcon.Dispose();
                 }
                 _disposed = true;
                 _timer.Dispose();
