@@ -96,6 +96,8 @@ cd apple-magic-trackpad-windows
 
 个人配置仍在上级运行目录的 `MagicForceClick.json`。保存前备份，保留高级及未知字段；检测其他窗口修改，并根据新鲜后台状态确认生效。截图来自隔离验收。详见[控制中心说明](MAGIC_CONTROL_CENTER.md)、[v1.2.0 更新说明](RELEASE_NOTES_v1.2.0.md)和[验证范围](TEST_REPORT_v1.2.0.md)。
 
+主分支已修复设置页预设高亮、草稿状态和保存反馈：曲线预设保留深按力度与功能开关，原生参数改回原值可恢复干净状态，后台生效确认同时核对进程、时间和实际参数。详见[设置状态修复说明](docs/control-center-settings.md)。已有 v1.2.0 发行附件保留原版。
+
 ## 工作流与实时状态 (See it in action)
 
 <p align="center">

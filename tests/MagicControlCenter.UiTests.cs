@@ -12,6 +12,7 @@ namespace MagicControlCenter.Tests
     {
         private const BindingFlags PrivateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
         private static int _passed, _failed;
+        private const int ExpectedChecks = 26;
 
         [DllImport("user32.dll")] private static extern bool SetProcessDpiAwarenessContext(IntPtr value);
         [DllImport("user32.dll")] private static extern int GetDpiForSystem();
@@ -144,12 +145,88 @@ namespace MagicControlCenter.Tests
                     acceleration.Checked = original.EnableAcceleration;
                     Invoke(window, "SaveChanges");
                     Pass("feature switches mark edits immediately and round-trip");
-                    Invoke(window, "ApplyPreset", "classic");
+                    var buttons = (FlowLayoutPanel)Field(window, "_presetButtons");
+                    ((Button)buttons.Controls[1]).PerformClick();
                     var preset = (ForceClickOptions)typeof(ControlCenterForm).GetField("_draft", PrivateInstance).GetValue(window);
-                    if (preset.ForceClickThreshold != 180 || Math.Abs(preset.MaxGain - 3.4) > 0.001) throw new Exception("Preset values were overwritten by old controls.");
+                    if (preset.ForceClickThreshold != original.ForceClickThreshold || preset.ForceClickDwellMs != original.ForceClickDwellMs
+                        || preset.ForceClickPressureRise != original.ForceClickPressureRise || preset.ForceClickImmediateThreshold != original.ForceClickImmediateThreshold
+                        || preset.EnableAcceleration != original.EnableAcceleration || preset.EnableMonitorCompensation != original.EnableMonitorCompensation
+                        || preset.AccelerateWhilePressed != original.AccelerateWhilePressed || preset.DragCancelCursorPixels != original.DragCancelCursorPixels
+                        || preset.DragCancelDistance != original.DragCancelDistance || Math.Abs(preset.MaxGain - 3.4) > 0.001)
+                        throw new Exception("Pointer preset modified pressure, switches or drag protection.");
+                    AssertPreset(window, PointerPreset.Classic);
+                    Capture(window, Path.Combine(output, "preset-classic.png"));
+                    Pass("actual preset click updates selection and preserves pressure and switches");
+                    ((NumericUpDown)Field(window, "_maxGain")).Value = 3.65M;
+                    AssertPreset(window, PointerPreset.Custom);
+                    if (!((Label)Field(window, "_draftProfileLabel")).Text.Contains("自定义")) throw new Exception("Custom curve was not labeled.");
+                    Capture(window, Path.Combine(output, "preset-custom.png"));
+                    ((NumericUpDown)Field(window, "_maxGain")).Value = 3.4M;
+                    AssertPreset(window, PointerPreset.Classic);
+                    Pass("manual curve edits and reverted values update actual button styling");
+                    ((Button)Field(window, "_previewModeButton")).PerformClick();
+                    preset = (ForceClickOptions)Field(window, "_draft");
+                    if (preset.EnableAcceleration || !preset.EnableForceClick || !((Label)Field(window, "_modeLabel")).Text.Contains("仅深按预览")) throw new Exception("Preview-only mode is not explicit.");
+                    AssertPreset(window, PointerPreset.Classic);
+                    if (preset.ForceClickThreshold != original.ForceClickThreshold) throw new Exception("Preview mode changed pressure.");
+                    Capture(window, Path.Combine(output, "preview-only-mode.png"));
+                    Pass("preview-only action is separate from the selected curve");
                     Invoke(window, "LoadConfiguration", true);
                     if (window.CanSave) throw new Exception("Discarding a preset retained old draft values.");
+                    AssertPreset(window, PointerPreset.LightCrossScreen);
                     Pass("presets and discard do not recapture stale controls");
+
+                    var mid = (NumericUpDown)Field(window, "_midSpeed"); mid.Value = 4.50M; mid.UpButton();
+                    if (mid.Value != 4.55M || mid.Text != 4.55M.ToString("F2", System.Globalization.CultureInfo.CurrentCulture)) throw new Exception("Visible speed differs from its value.");
+                    Invoke(window, "SaveChanges");
+                    if (ForceClickOptions.Load(config).MidSpeed != 4.55) throw new Exception("Visible precision did not survive save.");
+                    window.Navigate("overview"); window.Navigate("feel");
+                    AssertPreset(window, PointerPreset.Custom);
+                    if (((NumericUpDown)Field(window, "_midSpeed")).Value != 4.55M) throw new Exception("Navigation changed precision.");
+                    using (var reopened = new ControlCenterForm(directory, true))
+                    {
+                        reopened.Navigate("feel");
+                        if (((NumericUpDown)Field(reopened, "_midSpeed")).Value != 4.55M || reopened.CanSave) throw new Exception("Reopened precision or clean state differs.");
+                    }
+                    original.Save(config); Invoke(window, "LoadConfiguration", true);
+                    Pass("4.50 to 4.55 matches display, JSON, navigation and reopening");
+
+                    window.Navigate("gestures");
+                    var nativeChecks = (System.Collections.Generic.Dictionary<string, CheckBox>)Field(window, "_nativeChecks");
+                    bool originalTap = nativeChecks["tap"].Checked;
+                    nativeChecks["tap"].Checked = !originalTap; nativeChecks["tap"].Checked = originalTap;
+                    if (window.CanSave || (bool)Field(window, "_nativeDirty")) throw new Exception("Reverted native toggle is still dirty.");
+                    window.Navigate("feel");
+                    var speed = (TrackBar)Field(window, "_speed"); int originalSpeed = speed.Value;
+                    speed.Value = originalSpeed == 20 ? 19 : originalSpeed + 1; speed.Value = originalSpeed;
+                    if (window.CanSave) throw new Exception("Reverted native speed is still dirty.");
+                    string jsonBeforeNative = ConfigurationStore.Fingerprint(config);
+                    int backupsBeforeNative = Directory.GetFiles(Path.Combine(directory, "control-center-backups"), "*.json").Length;
+                    window.Navigate("gestures"); nativeChecks = (System.Collections.Generic.Dictionary<string, CheckBox>)Field(window, "_nativeChecks");
+                    nativeChecks["tap"].Checked = !originalTap; Invoke(window, "SaveChanges");
+                    if (ConfigurationStore.Fingerprint(config) != jsonBeforeNative || ((Label)Field(window, "_stateLabel")).Text != "Windows 设置已应用并回读") throw new Exception("Native-only save rewrote JSON or awaits backend.");
+                    nativeChecks = (System.Collections.Generic.Dictionary<string, CheckBox>)Field(window, "_nativeChecks");
+                    nativeChecks["tap"].Checked = originalTap; Invoke(window, "SaveChanges");
+                    if (Directory.GetFiles(Path.Combine(directory, "control-center-backups"), "*.json").Length != backupsBeforeNative) throw new Exception("Native-only save created JSON backups.");
+                    Pass("native reverted edits are clean and native-only save leaves JSON untouched");
+
+                    window.Navigate("feel"); ((NumericUpDown)Field(window, "_maxGain")).Value = 3.75M;
+                    if (!DriveDialog(window, delegate { Invoke(window, "RequestReload"); }, "重新读取配置", 7, Path.Combine(output, "reload-cancel.png"))) throw new Exception("Reload confirmation was not shown.");
+                    if (((NumericUpDown)Field(window, "_maxGain")).Value != 3.75M || !window.CanSave) throw new Exception("Cancel reload lost the draft.");
+                    if (!DriveDialog(window, delegate { Invoke(window, "RequestReload"); }, "重新读取配置", 6, Path.Combine(output, "reload-confirm.png"))) throw new Exception("Reload confirmation did not proceed.");
+                    if (window.CanSave || ((ForceClickOptions)Field(window, "_draft")).MaxGain != original.MaxGain) throw new Exception("Confirmed reload retained a stale draft.");
+                    Pass("reload cancel preserves draft and confirm reloads the saved configuration");
+
+                    string jsonBeforeInvalid = ConfigurationStore.Fingerprint(config);
+                    ((NumericUpDown)Field(window, "_maxGain")).Value = 0.9M;
+                    if (window.CanSave || !((Label)Field(window, "_stateLabel")).Text.Contains("快速最大增益")) throw new Exception("Invalid gain has no localized field error.");
+                    Invoke(window, "SaveChanges");
+                    SetEditorText((NumericUpDown)Field(window, "_maxGain"), "invalid");
+                    window.Navigate("press");
+                    if (window.CurrentPage != "feel" || window.CanSave) throw new Exception("Invalid numeric text was silently discarded.");
+                    if (ConfigurationStore.Fingerprint(config) != jsonBeforeInvalid) throw new Exception("Invalid draft changed JSON.");
+                    Invoke(window, "LoadConfiguration", true);
+                    Pass("invalid ranges and typed numbers cannot be silently saved or discarded by navigation");
                     foreach (var screen in Screen.AllScreens)
                     {
                         window.Location = new System.Drawing.Point(screen.WorkingArea.Left + 20, screen.WorkingArea.Top + 20);
@@ -250,12 +327,97 @@ namespace MagicControlCenter.Tests
                     if (!window.IsDisposed) throw new Exception("Confirmed close did not dispose the window.");
                     Pass("confirmed close cleans up the real window");
                 }
+                RuntimeUiFeedback(output);
+                Pass("overview and save feedback share process, input and runtime health checks");
+                PartialCommitUiFeedback(output);
+                Pass("post-commit UI warns truthfully and blocks retry until reload");
             }
             catch (Exception ex) { _failed++; Log("FAIL " + ex); }
-            if (_failed == 0 && _passed != 17) { _failed++; Log("FAIL expected 17 completed UI checks, got " + _passed); }
+            if (_failed == 0 && _passed != ExpectedChecks) { _failed++; Log("FAIL expected " + ExpectedChecks + " completed UI checks, got " + _passed); }
             Log("RESULT control_center_ui_passed=" + _passed + " failed=" + _failed);
-            File.WriteAllLines(result, new[] { "control_center_ui_passed=" + _passed, "expected=17", "completed=" + (_failed == 0 ? "true" : "false"), "failed=" + _failed });
+            File.WriteAllLines(result, new[] { "control_center_ui_passed=" + _passed, "expected=" + ExpectedChecks, "completed=" + (_failed == 0 ? "true" : "false"), "failed=" + _failed });
             return _failed == 0 ? 0 : 1;
+        }
+
+        private static object Field(object target, string name) { return target.GetType().GetField(name, PrivateInstance).GetValue(target); }
+
+        private static void SetEditorText(NumericUpDown number, string text)
+        {
+            foreach (Control child in number.Controls)
+                if (child is TextBoxBase) { child.Text = text; return; }
+            throw new Exception("Numeric text editor not found.");
+        }
+
+        private static void AssertPreset(ControlCenterForm window, PointerPreset expected)
+        {
+            var buttons = (FlowLayoutPanel)Field(window, "_presetButtons");
+            foreach (Control control in buttons.Controls)
+            {
+                var button = control as Button;
+                if (button == null || !(button.Tag is PointerPreset)) continue;
+                bool selected = (PointerPreset)button.Tag == expected;
+                if (button.BackColor.ToArgb() != (selected ? Ui.SagePale : System.Drawing.Color.White).ToArgb()
+                    || button.FlatAppearance.BorderColor.ToArgb() != (selected ? Ui.Sage : Ui.Line).ToArgb())
+                    throw new Exception("Actual preset styling does not match " + expected);
+            }
+        }
+
+        private sealed class ControlledRuntime : IRuntimeStatusProvider
+        {
+            internal ForceClickOptions Options;
+            internal bool Running = true, Registered = true, Old;
+            public RuntimeObservation Read(string directory, string path)
+            {
+                DateTime now = DateTime.UtcNow;
+                using (var stream = File.Create(path)) new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(RuntimeStatusSnapshot)).WriteObject(stream,
+                    new RuntimeStatusSnapshot { Version = "fixture", TimeUtc = Old ? now.AddMinutes(-5) : now, RawInputRegistered = Registered, Options = Options });
+                return new RuntimeObservation { ProcessRunning = Running, ProcessStartUtc = now.AddHours(-1), Status = RuntimeStatusSnapshot.Read(path, TimeSpan.FromSeconds(15)) };
+            }
+        }
+
+        private static void RuntimeUiFeedback(string output)
+        {
+            string directory = Path.Combine(output, "runtime-feedback"); Directory.CreateDirectory(directory);
+            string path = Path.Combine(directory, "MagicForceClick.json");
+            var original = new ForceClickOptions(); original.ApplyLightCrossScreenPreset(); original.Save(path);
+            var runtime = new ControlledRuntime { Options = original };
+            using (var window = new ControlCenterForm(directory, true, new MemoryTouchpadPlatform(), runtime, new ConfigurationStore()))
+            {
+                window.Show(); ShowWindow(window.Handle, 5); Application.DoEvents();
+                window.Navigate("feel"); ((NumericUpDown)Field(window, "_maxGain")).Value = 3.25M; Invoke(window, "SaveChanges");
+                if (((Label)Field(window, "_stateLabel")).Text.Contains("后台已生效")) throw new Exception("Unmatched runtime was confirmed.");
+                runtime.Options = ForceClickOptions.Load(path); Invoke(window, "RefreshRuntime");
+                if (((Label)Field(window, "_stateLabel")).Text != "已保存，后台已生效") throw new Exception("Healthy runtime was not confirmed.");
+                runtime.Running = false; Invoke(window, "RefreshRuntime");
+                if (!((Label)Field(window, "_runtimeLabel")).Text.Contains("进程未运行") || !((Label)Field(window, "_stateLabel")).Text.Contains("进程未运行")) throw new Exception("Overview and save disagree about missing process.");
+                runtime.Running = true; runtime.Registered = false; Invoke(window, "RefreshRuntime");
+                if (!((Label)Field(window, "_stateLabel")).Text.Contains("输入尚未注册")) throw new Exception("Unregistered input was confirmed.");
+                runtime.Registered = true; runtime.Old = true; Invoke(window, "RefreshRuntime");
+                if (!((Label)Field(window, "_stateLabel")).Text.Contains("已过期")) throw new Exception("Old status content was confirmed.");
+                Capture(window, Path.Combine(output, "runtime-unconfirmed.png"));
+                runtime.Old = false; Invoke(window, "RefreshRuntime"); window.Close();
+            }
+        }
+
+        private static void PartialCommitUiFeedback(string output)
+        {
+            string directory = Path.Combine(output, "partial-commit"); Directory.CreateDirectory(directory);
+            string path = Path.Combine(directory, "MagicForceClick.json");
+            var original = new ForceClickOptions(); original.ApplyLightCrossScreenPreset(); original.Save(path);
+            var runtime = new ControlledRuntime { Options = original };
+            var store = new ConfigurationStore(delegate(ConfigurationSaveStage stage) { if (stage == ConfigurationSaveStage.AfterCommit) throw new IOException("Simulated readback failure after replacement"); });
+            using (var window = new ControlCenterForm(directory, true, new MemoryTouchpadPlatform(), runtime, store))
+            {
+                window.Show(); ShowWindow(window.Handle, 5); Application.DoEvents(); window.Navigate("feel");
+                ((NumericUpDown)Field(window, "_maxGain")).Value = 3.25M;
+                if (!DriveDialog(window, delegate { Invoke(window, "SaveChanges"); }, "保存未完成", 1, Path.Combine(output, "partial-commit-warning.png"))) throw new Exception("Post-commit warning not shown.");
+                if (((Label)Field(window, "_stateLabel")).Text != "配置已写入，回读未确认" || window.CanSave || !(bool)Field(window, "_reloadRequired")) throw new Exception("Committed save is reported as unchanged or allows blind retry.");
+                if (ForceClickOptions.Load(path).MaxGain != 3.25) throw new Exception("Committed values were overwritten during recovery.");
+                Capture(window, Path.Combine(output, "partial-commit-state.png"));
+                Invoke(window, "LoadConfiguration", true);
+                if (window.CanSave || (bool)Field(window, "_reloadRequired")) throw new Exception("Reload did not resolve committed state.");
+                window.Close();
+            }
         }
 
         private static void Invoke(object target, string name, params object[] args)

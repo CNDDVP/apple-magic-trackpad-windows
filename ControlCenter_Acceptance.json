@@ -1,28 +1,31 @@
 ﻿{
     "SchemaVersion":  1,
-    "AppSha256":  "4578C9092BFC61C71FB89813FBDF69BA5203B4C9C0EAC241E83B0A0A70FA689B",
+    "AppSha256":  "1DA02D6A2A45D6C032A985F1D7E4816C9E0F88F66A1670026954F52D42320840",
     "SourceSHA256":  {
-                         "MagicControlCenter.Core.cs":  "3B11DFF1617F40695580A64780E082762E01D995A3B5E09E2A5057EDE942F3AF",
+                         "MagicControlCenter.Core.cs":  "21D69446C81B4DB557AEA06020E5DCFD3FCCD73CE6B5D7D6A8B8889D07EE363B",
                          "MagicForceClick.Core.cs":  "FA83A9D222078F85DE77E2D05B7FB3EE881E2DC0276CCB72A67688A5601C9324",
-                         "MagicControlCenter.Window.cs":  "1D54ABD789E0917BD90E6B7081C9F67A75FA0C2DFC4265FC1AE5C74C1FCE28A9",
-                         "MagicControlCenter.Platform.cs":  "D4B4D5782FE4C3C9FF0A2A0B496C72340C3E5067B25EF1E3B316DD7307A804D5",
+                         "MagicControlCenter.Window.cs":  "65D6E6033A370BA51DBB5C4D466D19DA5443B3541A1FAE9421403A1397E97694",
+                         "MagicControlCenter.Platform.cs":  "04452CCD01F4144653AD9A561E3C38FA29DEA5E5C4A163C33D19DC4A83725458",
                          "MagicControlCenter.Assembly.cs":  "E62A6A21CB081DDB2521B24B36F06E28731383B6385A2E4F7BADE174E9608FEB",
                          "MagicControlCenter.exe.config":  "07B973121E082C41ABCEA860D9DB158CC1A04502AB6483CA929BBD88281EE988",
                          "MagicControlCenter.manifest":  "579E0483D601298A284000BEB5B00FD6E0478CD267CD864B6918A600C2D27357",
                          "MagicControlCenter/MagicControlCenter.exe.config":  "07B973121E082C41ABCEA860D9DB158CC1A04502AB6483CA929BBD88281EE988",
                          "Build-ControlCenter.ps1":  "501C4FEB8E1B8EEF0806CF667AB2F77556A16B380AE68F5364DFBE91DCD008FF",
-                         "MagicControlCenter/MagicControlCenter.ico":  "626EE7FDFAA9BC6F10B9AC003B47DABD15B720C95AAA05E578E0F64B3DDF5C73"
+                         "MagicControlCenter/MagicControlCenter.ico":  "626EE7FDFAA9BC6F10B9AC003B47DABD15B720C95AAA05E578E0F64B3DDF5C73",
+                         "tests/MagicControlCenter.Tests.cs":  "1B0A5274075FA47BDF0C5EB29FBFF46602FC41A824E0680E722962EB5990C402",
+                         "tests/MagicControlCenter.UiTests.cs":  "2CEC98DE81BF3878B3E16F94E622D69B9E80F69152A11DCAC74CB95F6CABC867",
+                         "tests/MagicControlCenter.LiveTests.cs":  "E47A3759540AE3165822EFB7D9F3592E439B18E9E85CC5A52EACB33EBDE700B7"
                      },
-    "UiChecks":  17,
-    "CoreChecks":  7,
-    "ProductionRoundtripChecks":  0,
+    "UiChecks":  26,
+    "CoreChecks":  22,
+    "ProductionRoundtripChecks":  4,
     "Dpi":  [
                 144,
                 120,
                 96
             ],
-    "Validated":  "2026-10-25",
-    "Evidence":  "Icon-only update: 7 core checks and all 17 interactive UI checks on 144/120/96 DPI displays. Production JSON and backend hashes remain unchanged. Previous hot-reload roundtrip is recorded separately.",
+    "Validated":  "2026-10-26",
+    "Evidence":  "22 core checks, 26 interactive UI checks on 144/120/96 DPI displays, and 4 real production save/hot-reload/restore checks. Fault injection uses isolated files and in-memory native settings. Production JSON bytes, native parameters, registry, icon and backend PID were preserved.",
     "PriorProductionRoundtrip":  {
                                      "AppSha256":  "9AF3576FBE558A697159B1E86A213275EDF9CDFB98A8A1ED011454ED19644D60",
                                      "Checks":  4,

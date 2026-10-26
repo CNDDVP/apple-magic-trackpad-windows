@@ -5,6 +5,8 @@ using System.Drawing.Drawing2D;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using System.Globalization;
+using System.Collections.Generic;
 
 namespace MagicForceClick
 {
@@ -50,21 +52,33 @@ namespace MagicForceClick
         private readonly Label _runtimeLabel = new Label(), _deviceLabel = new Label(), _feedbackLabel = new Label();
         private readonly Button _saveButton = new Button(), _discardButton = new Button();
         private readonly Timer _timer = new Timer();
-        private readonly ConfigurationStore _store = new ConfigurationStore();
+        private readonly ConfigurationStore _store;
+        private readonly INativeTouchpadPlatform _nativePlatform;
+        private readonly IRuntimeStatusProvider _runtimeProvider;
+        private readonly ErrorProvider _errors;
         private ForceClickOptions _savedOptions, _draft;
         private NativeTouchpadSnapshot _savedNative, _draftNative;
         private RuntimeStatusSnapshot _runtime;
+        private RuntimeObservation _observation;
+        private RuntimeAssessment _assessment;
         private string _fingerprint, _page = "overview";
         private bool _loading, _nativeAvailable, _saving, _awaitingReload, _nativeDirty;
         private bool _disposed;
         private readonly Icon _applicationIcon;
         private bool _saveFailed;
+        private bool _reloadRequired, _nativeSaved;
+        private string _notice = "配置已读取", _failureState = "保存未完成";
+        private DraftValidationIssue _numberIssue;
         private float _dpiScale = 1f;
         private DateTime _savedAt;
         private FeelCurve _curve;
         private PressDiagram _pressDiagram;
         private Panel _overviewRuntime, _overviewDevice;
         private FlowLayoutPanel _presetButtons;
+        private Button _previewModeButton;
+        private Label _draftProfileLabel, _modeLabel, _overviewProfileCaption, _overviewSummary, _curveNote;
+        private readonly Dictionary<string, NumericUpDown> _numberEditors = new Dictionary<string, NumericUpDown>();
+        private readonly HashSet<string> _editedNumbers = new HashSet<string>();
         private NumericUpDown _threshold, _dwell, _rise, _immediate, _dragDistance, _dragPixels;
         private NumericUpDown _minGain, _maxGain, _midSpeed, _curvePower;
         private CheckBox _preview, _acceleration, _monitor, _pressed;
@@ -83,12 +97,19 @@ namespace MagicForceClick
         internal string CurrentPage { get { return _page; } }
 
         internal ControlCenterForm(string directory, bool isolated)
+            : this(directory, isolated, null, null, null) { }
+
+        internal ControlCenterForm(string directory, bool isolated, INativeTouchpadPlatform native, IRuntimeStatusProvider runtime, ConfigurationStore store)
         {
             SuspendLayout();
             _directory = Path.GetFullPath(directory);
             _configPath = Path.Combine(_directory, "MagicForceClick.json");
             _statusPath = Path.Combine(_directory, "MagicForceClick.status.json");
             _isolated = isolated;
+            _store = store ?? new ConfigurationStore();
+            _nativePlatform = native ?? (isolated ? (INativeTouchpadPlatform)new MemoryTouchpadPlatform() : new WindowsTouchpadPlatform());
+            _runtimeProvider = runtime ?? new RuntimeStatusProvider(isolated);
+            _errors = new ErrorProvider { ContainerControl = this, BlinkStyle = ErrorBlinkStyle.NeverBlink };
             Text = "Magic Trackpad · 控制中心";
             _applicationIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
             Icon = _applicationIcon;
@@ -122,6 +143,7 @@ namespace MagicForceClick
         internal void Navigate(string page)
         {
             if (!_navigation.ContainsKey(page)) throw new ArgumentException("Unknown page: " + page);
+            if (!_loading && !CommitNumericEditors()) return;
             CaptureDraft();
             _loading = true;
             try
@@ -196,6 +218,9 @@ namespace MagicForceClick
             _overviewRuntime = null;
             _overviewDevice = null;
             _presetButtons = null;
+            _previewModeButton = null; _draftProfileLabel = null; _modeLabel = null;
+            _overviewProfileCaption = null; _overviewSummary = null; _curveNote = null;
+            _errors.Clear(); _numberEditors.Clear(); _editedNumbers.Clear(); _numberIssue = null;
             _curve = null;
             _pressDiagram = null;
             _threshold = null; _dwell = null; _rise = null; _immediate = null; _dragDistance = null; _dragPixels = null;
@@ -213,30 +238,49 @@ namespace MagicForceClick
             _loading = true;
             try
             {
-                _savedOptions = ForceClickOptions.Load(_configPath);
+                ConfigurationSnapshot snapshot = ConfigurationSnapshot.Read(_configPath);
+                _savedOptions = snapshot.Options;
                 _draft = Clone(_savedOptions);
-                _fingerprint = ConfigurationStore.Fingerprint(_configPath);
+                _fingerprint = snapshot.Fingerprint;
                 try
                 {
-                    _savedNative = NativeTouchpadSnapshot.Read();
+                    _savedNative = _nativePlatform.Read();
                     _draftNative = new NativeTouchpadSnapshot(_savedNative.Parameters);
                     _nativeAvailable = true;
                 }
-                catch { _nativeAvailable = false; _nativeDirty = false; }
+                catch { _nativeAvailable = false; _nativeDirty = false; _savedNative = _draftNative = null; }
                 _awaitingReload = false;
                 _saveFailed = false;
+                _reloadRequired = false; _nativeSaved = false;
+                _notice = notify ? "已放弃未保存修改" : "配置已读取";
                 _nativeDirty = false;
                 RefreshRuntime();
                 Navigate(_page);
-                if (notify) _stateLabel.Text = "已放弃未保存修改";
             }
             catch (Exception ex)
             {
                 _stateLabel.Text = "配置读取失败，未修改原文件";
+                _reloadRequired = true; _saveFailed = true; _failureState = "配置读取失败，请重新读取";
                 if (!IsHandleCreated) throw;
                 MessageBox.Show(this, ex.Message + "\r\n\r\n" + _configPath, "无法读取配置", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
             finally { _loading = false; RefreshFeedback(); }
+        }
+
+        private bool HasChanges()
+        {
+            _nativeDirty = _nativeAvailable && _draftNative != null && !_draftNative.SameEditableValues(_savedNative);
+            return _numberIssue != null || _nativeDirty || !SameOptions(_draft, _savedOptions);
+        }
+
+        private void RequestReload()
+        {
+            CaptureDraft();
+            if (HasChanges() && MessageBox.Show(this, "重新读取将放弃未保存修改，是否继续？", "重新读取配置", MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
+            LoadConfiguration(false);
+            if (!_reloadRequired) _notice = "已重新读取配置";
+            RefreshFeedback();
         }
 
         private static ForceClickOptions Clone(ForceClickOptions source)
@@ -255,10 +299,12 @@ namespace MagicForceClick
             Header("你的触控板，按你的手感。", "保留熟悉的 Windows 手势，在这里调整指针、深按与滚动。", "概览");
             var intro = Ui.Card(0, 0, 820, 116);
             intro.Controls.Add(Ui.Text("Magic Trackpad", 22, 20, 16, new Font("Segoe UI", 24, FontStyle.Regular), Ui.Ink));
-            intro.Controls.Add(Ui.Text("当前手感", 22, 73, 12, Ui.Body, Ui.Muted));
+            _overviewProfileCaption = Ui.Text("已保存曲线", 22, 73, 12, Ui.Body, Ui.Muted);
+            intro.Controls.Add(_overviewProfileCaption);
             _profileLabel.SetBounds(126, 71, 235, 30); _profileLabel.Font = Ui.Emphasis; intro.Controls.Add(_profileLabel);
             intro.Controls.Add(Ui.Pill("保留现有驱动", 700, 22, Ui.SagePale, Ui.Sage));
-            intro.Controls.Add(Ui.Text("轻压预览，快速跨屏，慢速精准定位。", 400, 66, 11, Ui.Body, Ui.Muted));
+            _overviewSummary = Ui.Text("", 400, 62, 11, Ui.Small, Ui.Muted);
+            _overviewSummary.SetBounds(400, 62, 390, 48); intro.Controls.Add(_overviewSummary);
             _pageCanvas.Controls.Add(intro);
             _overviewRuntime = Ui.Card(0, 136, 400, 152);
             _overviewDevice = Ui.Card(420, 136, 400, 152);
@@ -281,38 +327,43 @@ namespace MagicForceClick
         private void BuildFeel()
         {
             Header("快一点，但不失控。", "先选曲线手感，再按需要微调参数；Windows 基础速度可在本页下方单独设置。", "指针手感");
-            var presets = Ui.Card(0, 0, 820, 86);
-            presets.Controls.Add(Ui.Text("手感方案", 18, 13, 12, Ui.Emphasis, Ui.Ink));
+            var presets = Ui.Card(0, 0, 820, 136);
+            presets.Controls.Add(Ui.Text("指针曲线方案", 18, 13, 12, Ui.Emphasis, Ui.Ink));
+            _draftProfileLabel = Ui.Text("", 170, 15, 10, Ui.Small, Ui.Sage);
+            _draftProfileLabel.Width = 620; presets.Controls.Add(_draftProfileLabel);
             _presetButtons = new FlowLayoutPanel { Left = 18, Top = 39, Width = 780, Height = 36, WrapContents = false };
-            _presetButtons.Controls.Add(Ui.Button("轻压跨屏", 116, delegate { ApplyPreset("light"); }, true));
-            _presetButtons.Controls.Add(Ui.Button("v1.1 经典", 116, delegate { ApplyPreset("classic"); }));
-            _presetButtons.Controls.Add(Ui.Button("仅深按预览", 126, delegate { ApplyPreset("preview"); }));
-            _presetButtons.Controls.Add(Ui.Text("选择后仍需保存；只改手感，不重置拖拽保护。", 14, 8, 10, Ui.Small, Ui.Muted));
-            _presetButtons.Controls[3].Width = 370;
+            var light = Ui.Button("轻压跨屏", 116, delegate { ApplyPreset("light"); }); light.Tag = PointerPreset.LightCrossScreen;
+            var classic = Ui.Button("v1.1 经典", 116, delegate { ApplyPreset("classic"); }); classic.Tag = PointerPreset.Classic;
+            _presetButtons.Controls.Add(light); _presetButtons.Controls.Add(classic);
+            _presetButtons.Controls.Add(Ui.Text("只改曲线；深按力度、功能开关和拖拽保护保持不变。", 14, 8, 10, Ui.Small, Ui.Muted));
+            _presetButtons.Controls[2].Width = 510;
             presets.Controls.Add(_presetButtons); _pageCanvas.Controls.Add(presets);
-            var graph = Ui.Card(0, 102, 430, 356);
+            _previewModeButton = Ui.Button("快捷：仅深按预览", 156, delegate { ApplyPreset("preview"); });
+            _previewModeButton.SetBounds(18, 88, 156, 32); presets.Controls.Add(_previewModeButton);
+            _modeLabel = Ui.Text("", 190, 95, 10, Ui.Small, Ui.Muted); _modeLabel.Width = 600; presets.Controls.Add(_modeLabel);
+            var graph = Ui.Card(0, 152, 430, 356);
             graph.Controls.Add(Ui.Text("S 型指针曲线", 18, 15, 13, Ui.Emphasis, Ui.Ink));
             _curve = new FeelCurve { Left = 18, Top = 48, Width = 392, Height = 232, Options = _draft };
             graph.Controls.Add(_curve);
             graph.Controls.Add(Ui.Text("指尖速度 →", 288, 290, 10, Ui.Small, Ui.Muted));
-            graph.Controls.Add(Ui.Text("增益随速度平滑上升，慢速微调，快速跨屏。", 18, 318, 10, Ui.Small, Ui.Muted));
+            _curveNote = Ui.Text("", 18, 318, 10, Ui.Small, Ui.Muted); _curveNote.Width = 394; graph.Controls.Add(_curveNote);
             _pageCanvas.Controls.Add(graph);
-            var controls = Ui.Card(450, 102, 370, 408);
+            var controls = Ui.Card(450, 152, 370, 408);
             controls.Controls.Add(Ui.Text("增强功能", 18, 15, 13, Ui.Emphasis, Ui.Ink));
             _acceleration = Switch("启用 S 型指针加速", 18, 47, _draft.EnableAcceleration);
             _monitor = Switch("多屏物理速度补偿", 18, 85, _draft.EnableMonitorCompensation);
             _pressed = Switch("按住拖拽时也加速", 18, 123, _draft.AccelerateWhilePressed);
             controls.Controls.Add(_acceleration); controls.Controls.Add(_monitor); controls.Controls.Add(_pressed);
             controls.Controls.Add(Ui.Divider(18, 163, 334));
-            _minGain = AddNumber(controls, "慢速增益", "越低越稳", 18, 178, 0.1M, 8M, 2, _draft.MinGain, FeelChanged);
-            _maxGain = AddNumber(controls, "快速最大增益", "跨屏效率", 18, 228, 0.1M, 8M, 2, _draft.MaxGain, FeelChanged);
-            _midSpeed = AddNumber(controls, "加速介入速度", "越小越早", 18, 278, 0.1M, 100M, 1, _draft.MidSpeed, FeelChanged);
-            _curvePower = AddNumber(controls, "曲线指数", "变化陡缓", 18, 328, 0.1M, 8M, 2, _draft.CurvePower, FeelChanged);
+            _minGain = AddNumber(controls, "慢速增益", "越低越稳", 18, 178, 0.1M, 8M, 2, _draft.MinGain, FeelChanged, "MinGain");
+            _maxGain = AddNumber(controls, "快速最大增益", "跨屏效率", 18, 228, 0.1M, 8M, 2, _draft.MaxGain, FeelChanged, "MaxGain");
+            _midSpeed = AddNumber(controls, "加速介入速度", "越小越早", 18, 278, 0.1M, 100M, 2, _draft.MidSpeed, FeelChanged, "MidSpeed");
+            _curvePower = AddNumber(controls, "曲线指数", "变化陡缓", 18, 328, 0.1M, 8M, 2, _draft.CurvePower, FeelChanged, "CurvePower");
             _pageCanvas.Controls.Add(controls);
-            var native = Ui.Card(0, 530, 820, 104);
+            var native = Ui.Card(0, 580, 820, 104);
             native.Controls.Add(Ui.Text("Windows 基础指针速度", 18, 13, 12, Ui.Emphasis, Ui.Ink));
             _speed = new TrackBar { Left = 18, Top = 42, Width = 260, Height = 44, Minimum = 1, Maximum = 20, TickFrequency = 1, AutoSize = false };
-            _speed.ValueChanged += delegate { if (_loading || !_nativeAvailable) return; _speedValue.Text = _speed.Value + " / 20"; _draftNative.WithSetting("cursorSpeed", _speed.Value); _nativeDirty = true; MarkDirty(); };
+            _speed.ValueChanged += delegate { if (_loading || !_nativeAvailable) return; _speedValue.Text = _speed.Value + " / 20"; _draftNative.WithSetting("cursorSpeed", _speed.Value); MarkDirty(); };
             native.Controls.Add(_speed);
             _speedValue = Ui.Text("", 292, 51, 11, Ui.Emphasis, Ui.Sage);
             _speedValue.Width = 105;
@@ -321,7 +372,7 @@ namespace MagicForceClick
             _pageCanvas.Controls.Add(native);
             if (_nativeAvailable) { _speed.Value = (int)Math.Max(1, Math.Min(20, _draftNative.Parameters.cursorSpeed)); _speedValue.Text = _speed.Value + " / 20"; }
             else { _speed.Enabled = false; _speedValue.Text = "API 不可用"; }
-            _pageCanvas.Controls.Add(Ui.Note("高级参数", "速度平滑、帧间隔和空闲重置会原样保留；需要精细调整时可在诊断页查看配置文件。", 0, 654, 820));
+            _pageCanvas.Controls.Add(Ui.Note("高级参数", "速度平滑、帧间隔和空闲重置会原样保留；需要精细调整时可在诊断页查看配置文件。", 0, 704, 820));
         }
 
         private void BuildPress()
@@ -330,14 +381,13 @@ namespace MagicForceClick
             var main = Ui.Card(0, 0, 370, 474);
             main.Controls.Add(Ui.Text("触发方式", 18, 15, 13, Ui.Emphasis, Ui.Ink));
             _preview = Switch("启用深按文件预览", 18, 47, _draft.EnableForceClick);
-            _preview.CheckedChanged += delegate { MarkDirty(); };
             main.Controls.Add(_preview);
-            _threshold = AddNumber(main, "压力阈值", "70–250，越低越容易", 18, 94, 70, 250, 0, _draft.ForceClickThreshold, PressChanged);
-            _dwell = AddNumber(main, "稳定时间", "毫秒，过滤短促用力", 18, 144, 0, 500, 0, _draft.ForceClickDwellMs, PressChanged);
-            _rise = AddNumber(main, "按下后加力", "防止按住就触发", 18, 194, 0, 100, 0, _draft.ForceClickPressureRise, PressChanged);
-            _immediate = AddNumber(main, "快速深按阈值", "0 为关闭即时触发", 18, 244, 0, 250, 0, _draft.ForceClickImmediateThreshold, PressChanged);
-            _dragPixels = AddNumber(main, "拖拽光标容差", "像素，防止预览打断拖拽", 18, 294, 1, 64, 0, _draft.DragCancelCursorPixels, PressChanged);
-            _dragDistance = AddNumber(main, "触控板移动容差", "原始坐标，默认 220", 18, 344, 10, 2000, 0, _draft.DragCancelDistance, PressChanged);
+            _threshold = AddNumber(main, "压力阈值", "70–250，越低越容易", 18, 94, 70, 250, 0, _draft.ForceClickThreshold, PressChanged, "ForceClickThreshold");
+            _dwell = AddNumber(main, "稳定时间", "毫秒，过滤短促用力", 18, 144, 0, 500, 0, _draft.ForceClickDwellMs, PressChanged, "ForceClickDwellMs");
+            _rise = AddNumber(main, "按下后加力", "防止按住就触发", 18, 194, 0, 100, 0, _draft.ForceClickPressureRise, PressChanged, "ForceClickPressureRise");
+            _immediate = AddNumber(main, "快速深按阈值", "0 为关闭即时触发", 18, 244, 0, 250, 0, _draft.ForceClickImmediateThreshold, PressChanged, "ForceClickImmediateThreshold");
+            _dragPixels = AddNumber(main, "拖拽光标容差", "像素，防止预览打断拖拽", 18, 294, 1, 64, 0, _draft.DragCancelCursorPixels, PressChanged, "DragCancelCursorPixels");
+            _dragDistance = AddNumber(main, "触控板移动容差", "原始坐标，默认 220", 18, 344, 10, 2000, 0, _draft.DragCancelDistance, PressChanged, "DragCancelDistance");
             main.Controls.Add(Ui.Text("低压阈值必须配合足够稳定时间和加力；\r\n不安全的组合会在保存前被拒绝。", 18, 414, 10, Ui.Small, Ui.Muted));
             _pageCanvas.Controls.Add(main);
             var visual = Ui.Card(390, 0, 430, 474);
@@ -398,7 +448,7 @@ namespace MagicForceClick
             files.Controls.Add(new TextBox { Text = _configPath, Left = 18, Top = 48, Width = 780, Height = 28, ReadOnly = true, BorderStyle = BorderStyle.None, BackColor = Color.White, ForeColor = Ui.Muted, Font = Ui.Small });
             var openConfig = Ui.Button("打开配置目录", 156, delegate { OpenFolder(_directory); });
             openConfig.SetBounds(18, 96, 156, 32); files.Controls.Add(openConfig);
-            var refresh = Ui.Button("重新读取", 120, delegate { LoadConfiguration(true); });
+            var refresh = Ui.Button("重新读取", 120, delegate { RequestReload(); });
             refresh.SetBounds(188, 96, 120, 32); files.Controls.Add(refresh);
             files.Controls.Add(Ui.Text("每次保存前创建 JSON 备份；不会自动还原，也不会覆盖其他窗口的新修改。", 350, 98, 10, Ui.Small, Ui.Muted));
             _pageCanvas.Controls.Add(files);
@@ -415,9 +465,9 @@ namespace MagicForceClick
         private void AddNative(Control parent, string name, string text, int x, int y)
         {
             bool value = _nativeAvailable && _draftNative.Parameters.HasFlag(Flag(name));
-            var box = Switch(text, x, y, value);
+            var box = Switch(text, x, y, value, false);
             box.Enabled = _nativeAvailable;
-            box.CheckedChanged += delegate { if (_loading || !_nativeAvailable) return; _draftNative.WithSetting(name, box.Checked); _nativeDirty = true; MarkDirty(); };
+            box.CheckedChanged += delegate { if (_loading || !_nativeAvailable) return; _draftNative.WithSetting(name, box.Checked); MarkDirty(); };
             _nativeChecks[name] = box;
             parent.Controls.Add(box);
         }
@@ -436,19 +486,21 @@ namespace MagicForceClick
             }
         }
 
-        private CheckBox Switch(string text, int x, int y, bool value)
+        private CheckBox Switch(string text, int x, int y, bool value, bool markDirty = true)
         {
             var box = new CheckBox { Text = text, Left = x, Top = y, Width = 320, Height = 30, Checked = value, Font = Ui.Body, ForeColor = Ui.Ink, AutoEllipsis = true };
-            box.CheckedChanged += delegate { MarkDirty(); };
+            if (markDirty) box.CheckedChanged += delegate { MarkDirty(); };
             return box;
         }
 
-        private NumericUpDown AddNumber(Control parent, string title, string hint, int x, int y, decimal min, decimal max, int decimals, double value, EventHandler changed)
+        private NumericUpDown AddNumber(Control parent, string title, string hint, int x, int y, decimal min, decimal max, int decimals, double value, EventHandler changed, string field)
         {
             var caption = Ui.Text(title, x, y, 11, Ui.Emphasis, Ui.Ink); caption.Width = 215; parent.Controls.Add(caption);
             var detail = Ui.Text(hint, x, caption.Bottom + 2, 9, Ui.Small, Ui.Muted); detail.Width = 215; parent.Controls.Add(detail);
             var input = new NumericUpDown { Left = x + 225, Top = y + 2, Width = 100, Height = 28, Minimum = min, Maximum = max, DecimalPlaces = decimals, Increment = decimals == 0 ? 1 : 0.05M, Value = (decimal)value, Font = Ui.Body, BorderStyle = BorderStyle.FixedSingle, TextAlign = HorizontalAlignment.Right };
-            input.ValueChanged += delegate { if (!_loading) { changed(input, EventArgs.Empty); MarkDirty(); } };
+            input.Name = field; input.AccessibleName = title; _numberEditors[field] = input;
+            EventHandler edit = delegate { if (!_loading) { _editedNumbers.Add(field); changed(input, EventArgs.Empty); MarkDirty(); } };
+            input.ValueChanged += edit; input.TextChanged += edit;
             parent.Controls.Add(input);
             return input;
         }
@@ -464,36 +516,70 @@ namespace MagicForceClick
 
         private void ApplyPreset(string preset)
         {
+            if (preset == "preview" && !CommitNumericEditors()) return;
             CaptureDraft();
-            if (preset == "light") _draft.ApplyLightCrossScreenPreset();
-            else if (preset == "classic")
-            {
-                ForceClickOptions baseline = new ForceClickOptions();
-                _draft.ForceClickThreshold = baseline.ForceClickThreshold; _draft.ForceClickDwellMs = baseline.ForceClickDwellMs;
-                _draft.ForceClickPressureRise = baseline.ForceClickPressureRise; _draft.ForceClickImmediateThreshold = baseline.ForceClickImmediateThreshold;
-                _draft.MinGain = baseline.MinGain; _draft.MaxGain = baseline.MaxGain; _draft.MidSpeed = baseline.MidSpeed; _draft.CurvePower = baseline.CurvePower;
-            }
+            if (preset == "light") ProfileCatalog.ApplyPointer(_draft, PointerPreset.LightCrossScreen);
+            else if (preset == "classic") ProfileCatalog.ApplyPointer(_draft, PointerPreset.Classic);
             else { _draft.EnableForceClick = true; _draft.EnableAcceleration = false; _draft.EnableMonitorCompensation = false; }
             _loading = true;
             Navigate(_page);
             MarkDirty();
         }
 
+        private bool TryNumber(NumericUpDown input, out decimal value)
+        {
+            if (!decimal.TryParse(input.Text, NumberStyles.Number, CultureInfo.CurrentCulture, out value)
+                || value < input.Minimum || value > input.Maximum || decimal.Round(value, input.DecimalPlaces) != value)
+            {
+                if (_numberIssue == null) _numberIssue = new DraftValidationIssue { Field = input.Name,
+                    Message = input.AccessibleName + (input.DecimalPlaces == 0 ? "须输入允许范围内的整数。" : "须输入允许范围内、最多两位小数的数字。") };
+                return false;
+            }
+            return true;
+        }
+
+        private bool CommitNumericEditors()
+        {
+            if (_loading) return true;
+            CaptureDraft();
+            if (_numberIssue != null) { RefreshFeedback(); return false; }
+            _loading = true;
+            try
+            {
+                foreach (string field in _editedNumbers)
+                {
+                    NumericUpDown input;
+                    decimal value;
+                    if (_numberEditors.TryGetValue(field, out input) && TryNumber(input, out value))
+                    { input.Value = value; input.Text = value.ToString("F" + input.DecimalPlaces, CultureInfo.CurrentCulture); }
+                }
+            }
+            finally { _loading = false; }
+            CaptureDraft();
+            return _numberIssue == null;
+        }
+
         private void CaptureDraft()
         {
             if (_draft == null || _loading) return;
+            _numberIssue = null;
             if (_preview != null) _draft.EnableForceClick = _preview.Checked;
             if (_acceleration != null) _draft.EnableAcceleration = _acceleration.Checked;
             if (_monitor != null) _draft.EnableMonitorCompensation = _monitor.Checked;
             if (_pressed != null) _draft.AccelerateWhilePressed = _pressed.Checked;
-            if (_threshold != null) { _draft.ForceClickThreshold = (int)_threshold.Value; _draft.ForceClickDwellMs = (double)_dwell.Value; _draft.ForceClickPressureRise = (int)_rise.Value; _draft.ForceClickImmediateThreshold = (int)_immediate.Value; _draft.DragCancelCursorPixels = (int)_dragPixels.Value; _draft.DragCancelDistance = (int)_dragDistance.Value; }
-            if (_minGain != null) { _draft.MinGain = (double)_minGain.Value; _draft.MaxGain = (double)_maxGain.Value; _draft.MidSpeed = (double)_midSpeed.Value; _draft.CurvePower = (double)_curvePower.Value; }
+            foreach (string name in _editedNumbers)
+            {
+                NumericUpDown input; decimal value;
+                if (!_numberEditors.TryGetValue(name, out input) || !TryNumber(input, out value)) continue;
+                var field = typeof(ForceClickOptions).GetField(name);
+                field.SetValue(_draft, Convert.ChangeType(value, field.FieldType, CultureInfo.InvariantCulture));
+            }
         }
 
         private void MarkDirty()
         {
             if (_loading) return;
-            _saveFailed = false;
+            if (!_reloadRequired) _saveFailed = false;
             CaptureDraft();
             RefreshFeedback();
             RefreshOverview();
@@ -501,130 +587,135 @@ namespace MagicForceClick
 
         private void RefreshFeedback()
         {
-            if (_saveButton == null || _draft == null) return;
-            bool dirty = _nativeDirty || !SameOptions(_draft, _savedOptions);
-            _saveButton.Enabled = dirty && !_saving;
+            if (_draft == null || _savedOptions == null) return;
+            bool dirty = HasChanges();
+            DraftValidationIssue issue = _numberIssue ?? DraftValidationIssue.Check(_draft);
+            _errors.Clear();
+            NumericUpDown input;
+            if (issue != null && _numberEditors.TryGetValue(issue.Field, out input)) _errors.SetError(input, issue.Message);
+            _saveButton.Enabled = dirty && !_saving && !_reloadRequired && issue == null;
             _saveButton.BackColor = _saveButton.Enabled ? Ui.Sage : Ui.Line;
-            _discardButton.Enabled = dirty && !_saving;
-            _profileLabel.Text = ProfileName(_draft);
+            _discardButton.Enabled = (dirty || _reloadRequired) && !_saving;
             if (_saving) _stateLabel.Text = "正在保存并回读…";
-            else if (_saveFailed) _stateLabel.Text = "保存未完成";
+            else if (_saveFailed) _stateLabel.Text = _failureState;
+            else if (issue != null) _stateLabel.Text = "参数错误：" + issue.Message;
             else if (dirty) _stateLabel.Text = "有未保存修改";
-            else if (_awaitingReload) _stateLabel.Text = _runtime != null && _runtime.IsLive && _runtime.LastWriteUtc >= _savedAt && _runtime.Options != null && SameOptions(_runtime.Options, _savedOptions) ? "已保存，后台已生效" : "已保存，等待后台热加载…";
-            else if (_stateLabel.Text != "已放弃未保存修改") _stateLabel.Text = "配置已读取";
-            _stateLabel.ForeColor = dirty ? Ui.Warning : Ui.Muted;
+            else if (_nativeSaved) _stateLabel.Text = "Windows 设置已应用并回读";
+            else if (_awaitingReload)
+                _stateLabel.Text = _assessment != null && _assessment.Applied ? "已保存，后台已生效" : "已保存，未确认生效：" + (_assessment == null ? "等待新鲜状态" : _assessment.Reason);
+            else _stateLabel.Text = _notice;
+            _stateLabel.ForeColor = dirty || issue != null || _saveFailed ? Ui.Warning : Ui.Muted;
+            RefreshPresetState();
+            RefreshOverview();
+        }
+
+        private void RefreshPresetState()
+        {
+            PointerPreset selected = ProfileCatalog.IdentifyPointer(_draft);
+            if (_presetButtons != null)
+                foreach (Control control in _presetButtons.Controls)
+                {
+                    var button = control as Button;
+                    if (button == null || !(button.Tag is PointerPreset)) continue;
+                    bool active = (PointerPreset)button.Tag == selected;
+                    button.BackColor = active ? Ui.SagePale : Color.White;
+                    button.ForeColor = active ? Ui.Sage : Ui.Ink;
+                    button.FlatAppearance.BorderColor = active ? Ui.Sage : Ui.Line;
+                    button.AccessibleDescription = active ? "当前草稿曲线" : "应用此曲线，保留其他参数";
+                }
+            if (_draftProfileLabel != null) _draftProfileLabel.Text = "当前草稿曲线：" + ProfileName(_draft) + (HasChanges() ? "（未保存）" : "（已保存）");
+            if (_modeLabel != null) _modeLabel.Text = "当前草稿模式：" + ProfileCatalog.ModeName(_draft);
+            if (_curveNote != null) _curveNote.Text = _draft.EnableAcceleration ? "增益随速度平滑上升，慢速微调，快速跨屏。" : "指针加速已关闭；图中仅保留曲线设置。";
+            if (_curve != null) _curve.Invalidate();
+            if (_pressDiagram != null) _pressDiagram.Invalidate();
         }
 
         private static string ProfileName(ForceClickOptions value)
         {
-            switch (ProfileCatalog.Identify(value))
+            switch (ProfileCatalog.IdentifyPointer(value))
             {
-                case "LightCrossScreen": return "轻压跨屏";
-                case "Classic": return "v1.1 经典";
-                default: return "自定义手感";
+                case PointerPreset.LightCrossScreen: return "轻压跨屏";
+                case PointerPreset.Classic: return "v1.1 经典";
+                default: return "自定义曲线";
             }
         }
 
-        private static bool SameOptions(ForceClickOptions a, ForceClickOptions b)
-        {
-            if (a == null || b == null) return false;
-            return a.EnableForceClick == b.EnableForceClick && a.EnableAcceleration == b.EnableAcceleration && a.EnableMonitorCompensation == b.EnableMonitorCompensation
-                && a.AccelerateWhilePressed == b.AccelerateWhilePressed && a.ForceClickThreshold == b.ForceClickThreshold && a.ForceClickDwellMs == b.ForceClickDwellMs
-                && a.ForceClickPressureRise == b.ForceClickPressureRise && a.ForceClickImmediateThreshold == b.ForceClickImmediateThreshold && a.DragCancelDistance == b.DragCancelDistance
-                && a.DragCancelCursorPixels == b.DragCancelCursorPixels && a.MinGain == b.MinGain && a.MaxGain == b.MaxGain && a.MidSpeed == b.MidSpeed && a.CurvePower == b.CurvePower
-                && a.SpeedSmoothingMs == b.SpeedSmoothingMs && a.MaxFrameIntervalMs == b.MaxFrameIntervalMs && a.IdleResetMs == b.IdleResetMs;
-        }
+        private static bool SameOptions(ForceClickOptions a, ForceClickOptions b) { return OptionValues.Equal(a, b); }
 
         private void RefreshRuntime()
         {
-            if (_isolated)
-            {
-                _runtime = RuntimeStatusSnapshot.Unavailable("隔离测试模式");
-            }
-            else
-            {
-                try { _runtime = RuntimeStatusSnapshot.Read(_statusPath, TimeSpan.FromSeconds(15)); }
-                catch (Exception ex) { _runtime = RuntimeStatusSnapshot.Unavailable(ex.Message); }
-            }
-            bool processRunning = false;
-            if (!_isolated)
-            {
-                try
-                {
-                    foreach (var process in Process.GetProcessesByName("MagicForceClick"))
-                    {
-                        using (process)
-                        {
-                            try { if (string.Equals(Path.GetDirectoryName(process.MainModule.FileName), _directory.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase)) processRunning = true; }
-                            catch { }
-                        }
-                    }
-                }
-                catch { }
-            }
-            string live = _runtime != null && _runtime.IsLive && processRunning && _runtime.RawInputRegistered ? "运行中 · 输入已注册" : "未确认运行";
-            string age = _runtime != null && _runtime.LastWriteUtc != DateTime.MinValue ? (DateTime.UtcNow - _runtime.LastWriteUtc).TotalSeconds.ToString("0") + " 秒前更新" : "没有新鲜状态";
-            _runtimeLabel.Text = live + "\r\n" + age + " · " + (_runtime != null ? (_runtime.Version ?? "未知版本") : "未知版本");
-            _runtimeLabel.ForeColor = live.StartsWith("运行中") ? Ui.Sage : Ui.Warning;
-            _deviceLabel.Text = _nativeAvailable ? "原生 API 可读取\r\n轻点 / 滚动 / 缩放可在此管理" : "原生 API 暂不可用\r\n请从正常 Windows 会话打开面板";
+            try { _observation = _runtimeProvider.Read(_directory, _statusPath); }
+            catch (Exception error) { _observation = new RuntimeObservation { Status = RuntimeStatusSnapshot.Unavailable(error.Message) }; }
+            _runtime = _observation.Status;
+            _assessment = RuntimeAssessment.Evaluate(_observation, _savedOptions, _awaitingReload ? _savedAt : DateTime.MinValue, DateTime.UtcNow);
+            string live = _assessment.Healthy ? "运行中 · 输入已注册" : _assessment.Reason;
+            string age = _runtime != null && _runtime.LastWriteUtc != DateTime.MinValue ? Math.Max(0, (DateTime.UtcNow - _runtime.LastWriteUtc).TotalSeconds).ToString("0") + " 秒前更新" : "没有新鲜状态";
+            _runtimeLabel.Text = live + "\r\n" + age + " · " + (_runtime == null ? "未知版本" : (_runtime.Version ?? "未知版本"));
+            _runtimeLabel.ForeColor = _assessment.Healthy ? Ui.Sage : Ui.Warning;
+            _deviceLabel.Text = _nativeAvailable ? (_isolated ? "隔离原生参数 · 仅用于测试\r\n不写入 Windows 实际设置" : "原生 API 可读取\r\n轻点 / 滚动 / 缩放可在此管理") : "原生 API 暂不可用\r\n请从正常 Windows 会话打开面板";
             _deviceLabel.ForeColor = _nativeAvailable ? Ui.Sage : Ui.Warning;
             if (_diagnosticsText != null)
             {
-                _diagnosticsText.Text = "后台进程：" + (processRunning ? "运行中" : "未找到 / 隔离模式") + "\r\n"
-                    + "Raw Input：" + (_runtime != null && _runtime.RawInputRegistered ? "已注册" : "未确认") + "    状态：" + live + "    " + age + "\r\n"
-                    + "指针输出：" + (_runtime != null ? (_runtime.PointerOutput ?? "—") : "—") + "    有效帧：" + (_runtime != null ? _runtime.ValidScanFrames : 0) + "\r\n"
-                    + "重复帧：" + (_runtime != null ? _runtime.DuplicateScanFrames : 0) + "    不连续：" + (_runtime != null ? _runtime.Discontinuities : 0) + "    提交失败：" + (_runtime != null ? _runtime.PointerSubmissionFailures : 0) + "\r\n"
-                    + "配置文件：" + _configPath + (_isolated ? "\r\n隔离测试不会读取本机配置目录的实时状态。" : "");
+                _diagnosticsText.Text = "后台进程：" + (_observation.ProcessRunning ? "运行中" : "未找到 / 隔离模式") + "\r\n"
+                    + "输入与进程：" + live + "    " + age + "\r\n"
+                    + "Raw Input：" + (_runtime != null && _runtime.RawInputRegistered ? "已注册" : "未确认") + "    生效确认：" + _assessment.Reason + "\r\n"
+                    + "指针输出：" + (_runtime == null ? "—" : (_runtime.PointerOutput ?? "—")) + "    有效帧：" + (_runtime == null ? 0 : _runtime.ValidScanFrames) + "\r\n"
+                    + "重复帧：" + (_runtime == null ? 0 : _runtime.DuplicateScanFrames) + "    不连续：" + (_runtime == null ? 0 : _runtime.Discontinuities) + "    提交失败：" + (_runtime == null ? 0 : _runtime.PointerSubmissionFailures) + "\r\n"
+                    + "配置文件：" + _configPath + (_isolated ? "\r\n隔离模式使用内存原生设置，不写入 Windows。" : "");
             }
             RefreshFeedback();
         }
 
         private void RefreshOverview()
         {
-            if (_page == "overview" && _profileLabel != null) _profileLabel.Text = ProfileName(_draft);
+            if (_page != "overview" || _draft == null || _savedOptions == null) return;
+            bool applied = _assessment != null && _assessment.Applied;
+            ForceClickOptions actual = applied && _runtime != null ? _runtime.Options : _savedOptions;
+            _profileLabel.Text = ProfileName(actual);
+            if (_overviewProfileCaption != null) _overviewProfileCaption.Text = applied ? "后台生效曲线" : "已保存曲线";
+            if (_overviewSummary != null) _overviewSummary.Text = ProfileCatalog.ModeName(actual) + "\r\n"
+                + (HasChanges() ? "待保存草稿：" + ProfileName(_draft) : (applied ? "已保存与生效参数一致" : "后台未确认：" + (_assessment == null ? "没有状态" : _assessment.Reason)));
         }
 
         private void SaveChanges()
         {
-            if (_saving) return;
+            if (_saving || _reloadRequired || !CommitNumericEditors()) return;
             CaptureDraft();
-            _saving = true;
-            _saveFailed = false;
+            if (!HasChanges() || _numberIssue != null || DraftValidationIssue.Check(_draft) != null) { RefreshFeedback(); return; }
+            _saving = true; _saveFailed = false;
             RefreshFeedback();
+            DateTime started = DateTime.UtcNow;
             try
             {
-                _draft.Validate();
-                if (ConfigurationStore.Fingerprint(_configPath) != _fingerprint)
-                    throw new ConfigurationChangedException("配置已在其他窗口中更改。请重新读取后再保存。");
-                if (_nativeDirty && _isolated) throw new InvalidOperationException("隔离模式不会写入 Windows 原生参数。");
-                // Keep a verified snapshot for rollback if the JSON commit fails.
-                NativeTouchpadSnapshot beforeNative = null;
-                if (_nativeDirty && _nativeAvailable) beforeNative = NativeTouchpadSnapshot.Read();
-                if (beforeNative != null && (beforeNative.Parameters.cursorSpeed != _savedNative.Parameters.cursorSpeed ||
-                    (beforeNative.Parameters.userFlags & NativeTouchpadSnapshot.SupportedFlags) != (_savedNative.Parameters.userFlags & NativeTouchpadSnapshot.SupportedFlags)))
-                    throw new ConfigurationChangedException("Windows 触控板设置已被其他窗口更改。请重新读取后再保存。");
-                if (beforeNative != null) NativeTouchpadApi.Save(_draftNative);
-                BackupInfo backup;
-                try { backup = _store.Save(_configPath, _draft, _fingerprint); }
-                catch { if (beforeNative != null) NativeTouchpadApi.Save(beforeNative); throw; }
-                _savedOptions = ForceClickOptions.Load(_configPath);
-                _draft = Clone(_savedOptions);
-                _fingerprint = ConfigurationStore.Fingerprint(_configPath);
-                _savedAt = DateTime.UtcNow;
-                _awaitingReload = true;
+                SettingsSaveResult result = SettingsSaver.Save(_configPath, _draft, _savedOptions, _fingerprint,
+                    _nativeAvailable ? _draftNative : null, _savedNative, _nativePlatform, _store);
+                if (!result.Success)
+                {
+                    _saveFailed = true; _reloadRequired = result.RequiresReload;
+                    _failureState = result.JsonCommitted ? "配置已写入，回读未确认" : (result.RecoveryError != null ? "恢复未确认，请重新读取" : "保存未完成");
+                    MessageBox.Show(this, result.Error.Message + "\r\n\r\n" + result.FailureMessage
+                        + (result.RecoveryError == null ? "" : "\r\n恢复异常：" + result.RecoveryError.Message),
+                        "保存未完成", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                if (result.Configuration != null)
+                {
+                    _savedOptions = result.Configuration.Options; _draft = Clone(_savedOptions);
+                    _fingerprint = result.Configuration.Fingerprint;
+                }
+                if (result.Native != null)
+                {
+                    _savedNative = result.Native;
+                    _draftNative = new NativeTouchpadSnapshot(_savedNative.Parameters);
+                }
+                _savedAt = started; _awaitingReload = result.JsonCommitted;
+                _nativeSaved = result.NativeAttempted && !result.JsonCommitted;
                 _nativeDirty = false;
-                if (_nativeAvailable) _savedNative = NativeTouchpadSnapshot.Read();
-                _stateLabel.Text = "已保存，等待后台热加载…";
+                _loading = true;
                 Navigate(_page);
                 RefreshRuntime();
             }
-            catch (Exception ex)
-            {
-                _stateLabel.Text = "保存未完成";
-                _saveFailed = true;
-                MessageBox.Show(this, ex.Message + "\r\n\r\n原配置未被替换；可重试或放弃修改。", "保存未完成", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-            finally { _saving = false; RefreshFeedback(); }
+            finally { _loading = false; _saving = false; RefreshFeedback(); }
         }
 
         private void OpenFeedback()
@@ -657,7 +748,7 @@ namespace MagicForceClick
         private void OnFormClosing(object sender, FormClosingEventArgs e)
         {
             CaptureDraft();
-            if (_nativeDirty || !SameOptions(_draft, _savedOptions))
+            if (HasChanges() || _reloadRequired)
             {
                 DialogResult result = MessageBox.Show(this, "有未保存修改。要放弃这些修改并关闭吗？", "Magic Trackpad 控制中心", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (result != DialogResult.Yes) e.Cancel = true;
@@ -686,6 +777,7 @@ namespace MagicForceClick
                 }
                 _disposed = true;
                 _timer.Dispose();
+                _errors.Dispose();
             }
             base.Dispose(disposing);
         }
@@ -837,7 +929,7 @@ namespace MagicForceClick
             AddNav(sidebar, navigation, "press", "◉   深按预览", 254);
             AddNav(sidebar, navigation, "gestures", "☝   原生手势", 302);
             AddNav(sidebar, navigation, "diagnostics", "≡   运行诊断", 350);
-            var note = Text("Windows 原生手势\r\nMagicForceClick 增强\r\n\r\n本机方案 v1.1.1", 24, 505, 9, Small, Muted);
+            var note = Text("Windows 原生手势\r\nMagicForceClick 增强\r\n\r\n后台版本见运行诊断", 24, 505, 9, Small, Muted);
             note.Height = 90; sidebar.Controls.Add(note);
             var main = new Panel { Dock = DockStyle.Fill, BackColor = Canvas };
             form.Controls.Add(main); main.BringToFront();

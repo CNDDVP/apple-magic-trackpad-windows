@@ -150,3 +150,5 @@ To compile from source and run the test suites locally:
 The full installer and update package now include the five-page Control Center, its DPI configuration, a desktop shortcut and Open_MagicTrackpad_ControlCenter.cmd. It manages pointer curves, pressure preview, native gestures and live diagnostics, with JSON backups and external-edit protection. The validated v1.1.1 backend is retained; 1.2.0 is the suite version. See [Control Center guide](../MAGIC_CONTROL_CENTER.md), [release notes](../RELEASE_NOTES_v1.2.0.md) and [verification scope](../TEST_REPORT_v1.2.0.md).
 
 ![Control Center, isolated acceptance capture](assets/control-center.png)
+
+The main branch also fixes preset selection, draft tracking and save feedback. Pointer presets preserve pressure settings and feature switches; reverted native edits become clean, and backend confirmation checks the matching process, timestamps, input registration and effective options. See the [settings-state fix notes](control-center-settings.md). Existing v1.2.0 release assets remain unchanged.
