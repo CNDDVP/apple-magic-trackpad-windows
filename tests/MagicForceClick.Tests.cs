@@ -51,13 +51,43 @@ namespace MagicForceClick.Tests
                 Run("independent switches all off gives unity", delegate { var o = Options(); o.EnableAcceleration = o.EnableMonitorCompensation = false; Near(PointerGain.Combined(20, 0.673, false, o), 1); });
                 Run("monitor only independent", delegate { var o = Options(); o.EnableAcceleration = false; Near(PointerGain.Combined(20, 0.673, false, o), 0.673); });
                 Run("acceleration only independent", delegate { var o = Options(); o.EnableMonitorCompensation = false; Near(PointerGain.Combined(4.5, 0.673, false, o), 2.175); });
-                Run("pressed acceleration toggle", delegate { var o = Options(); o.AccelerateWhilePressed = false; Near(PointerGain.Combined(20, 0.897, true, o), 0.897); });
+                Run("pressed acceleration toggle", delegate {
+                    var o = Options(); o.AccelerateWhilePressed = false;
+                    Near(PointerGain.Combined(20, 0.897, true, o), 0.897);
+                    o.AccelerateWhilePressed = true;
+                    Near(PointerGain.Combined(20, 0.897, true, o), PointerGain.Curve(20, o) * 0.897);
+                });
+                Run("stable press default retains unpressed acceleration and monitor compensation", delegate {
+                    var o = Options();
+                    Assert(!o.AccelerateWhilePressed && o.EnableAcceleration && o.EnableMonitorCompensation && o.EnableForceClick, "default disables unrelated features");
+                    foreach (double speed in new double[] { 0, 1, 4.5, 20 })
+                    {
+                        Near(PointerGain.Combined(speed, 0.897, true, o), 0.897);
+                        Near(PointerGain.Combined(speed, 0.897, false, o), PointerGain.Curve(speed, o) * 0.897);
+                    }
+                });
+                Run("missing configuration uses stable pressed movement", delegate {
+                    WithFile("{}", delegate(string path) {
+                        File.Delete(path);
+                        Assert(!ForceClickOptions.Load(path).AccelerateWhilePressed, "missing file restored pressed acceleration");
+                    });
+                });
+                Run("explicit pressed acceleration survives load and save", delegate {
+                    WithFile("{\"AccelerateWhilePressed\":true}", delegate(string path) {
+                        var o = ForceClickOptions.Load(path);
+                        Assert(o.AccelerateWhilePressed, "existing opt-in was discarded");
+                        o.Save(path);
+                        var loaded = ForceClickOptions.Load(path);
+                        Assert(loaded.AccelerateWhilePressed, "saved opt-in was discarded");
+                        Near(PointerGain.Combined(20, 1, true, loaded), PointerGain.Curve(20, loaded));
+                    });
+                });
                 Run("curve monotonic and bounded", delegate { var o = Options(); double previous = 0; for(int i=0;i<10000;i++) { double g=PointerGain.Curve(i*0.01,o); Assert(g>=previous && g>=o.MinGain && g<=o.MaxGain,"curve invalid");previous=g;} });
                 Run("decoder exact report and scan offset", delegate { var r = new byte[112]; r[0]=5;r[1]=2;r[106]=0x34;r[107]=0x12;r[108]=1;r[111]=1;r[109]=200;TrackpadSample s;Assert(TrackpadSample.TryDecode(r,out s) && s.ScanTime==0x1234 && s.Button && s.Pressure==200,"decode incorrect"); });
                 Run("malformed report rejected", delegate { TrackpadSample s; Assert(!TrackpadSample.TryDecode(new byte[111],out s),"short accepted");var r=new byte[112];r[0]=1;Assert(!TrackpadSample.TryDecode(r,out s),"wrong ID accepted"); });
                 Run("invalid gain rejected", delegate {var o=Options();o.MaxGain=0.2;Assert(Throws(o.Validate),"range accepted");});
                 Run("nonfinite settings rejected", delegate {var o=Options();o.MidSpeed=double.NaN;Assert(Throws(o.Validate),"NaN accepted");});
-                Run("configuration missing members retain defaults", delegate { WithFile("{\"EnableAcceleration\":false}", delegate(string path) {var o=ForceClickOptions.Load(path);Assert(!o.EnableAcceleration && o.EnableForceClick && o.ForceClickThreshold==180,"defaults lost");}); });
+                Run("configuration missing members retain defaults", delegate { WithFile("{\"EnableAcceleration\":false}", delegate(string path) {var o=ForceClickOptions.Load(path);Assert(!o.EnableAcceleration && o.EnableForceClick && !o.AccelerateWhilePressed && o.ForceClickThreshold==180,"defaults lost");}); });
                 Run("invalid JSON rejected", delegate {WithFile("{not-json",delegate(string path){Assert(Throws(delegate{ForceClickOptions.Load(path);}),"bad JSON accepted");});});
                 Run("save is roundtrippable and replaceable", delegate {WithFile("{}",delegate(string path){var o=Options();o.EnableMonitorCompensation=false;o.Save(path);var b=ForceClickOptions.Load(path);Assert(!b.EnableMonitorCompensation && b.EnableAcceleration,"roundtrip");o.MaxGain=2.5;o.Save(path);Near(ForceClickOptions.Load(path).MaxGain,2.5);});});
                 Run("light profile leaves slow targeting nearly unchanged", delegate {

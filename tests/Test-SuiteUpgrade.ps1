@@ -10,6 +10,8 @@ New-Item -ItemType Directory -Path $runtime|Out-Null
 Copy-Item -LiteralPath (Join-Path $PackageRoot 'MagicForceClick.exe') -Destination $runtime
 $config=Join-Path $runtime 'MagicForceClick.json'
 $text=[IO.File]::ReadAllText((Join-Path $PackageRoot 'MagicForceClick.json')).Trim()
+# An existing explicit opt-in must survive an upgrade from the new opt-out default.
+$text=[regex]::Replace($text,'("AccelerateWhilePressed"\s*:\s*)false','$1true')
 $text=$text.Substring(0,$text.Length-1)+',"FutureValue":{"Keep":true}}'
 [IO.File]::WriteAllText($config,$text,[Text.UTF8Encoding]::new($false))
 $configHash=(Get-FileHash -LiteralPath $config).Hash

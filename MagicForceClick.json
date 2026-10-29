@@ -3,7 +3,7 @@
   "EnableForceClick": true,
   "EnableAcceleration": true,
   "EnableMonitorCompensation": true,
-  "AccelerateWhilePressed": true,
+  "AccelerateWhilePressed": false,
   "ForceClickThreshold": 180,
   "ForceClickDwellMs": 0,
   "ForceClickPressureRise": 0,

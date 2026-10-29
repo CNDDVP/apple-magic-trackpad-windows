@@ -152,3 +152,5 @@ The full installer and update package now include the five-page Control Center, 
 ![Control Center, isolated acceptance capture](assets/control-center.png)
 
 The main branch also fixes preset selection, draft tracking and save feedback. Pointer presets preserve pressure settings and feature switches; reverted native edits become clean, and backend confirmation checks the matching process, timestamps, input registration and effective options. See the [settings-state fix notes](control-center-settings.md). Existing v1.2.0 release assets remain unchanged.
+
+Held-button acceleration (`AccelerateWhilePressed`) is now **off by default** in both the configuration template and program fallback. This reduces amplification of small movements while physically clicking; normal pointer acceleration, cross-screen compensation, press-and-drag and pressure-preview settings are retained. Existing configurations, including an explicit `true`, are preserved during upgrades. To try this adjustment on an existing installation, clear **Accelerate while dragging** in Control Center and save. See the [click-stability validation notes](click-stability.md).

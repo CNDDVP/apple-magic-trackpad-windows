@@ -190,7 +190,9 @@ v1.1.1 在 **Windows 11 x64 + 蓝牙 Apple USB-C 妙控板（A3120 / PID `0324`�
 | `EnableForceClick` | `true` | `true` | 独立开关：深按文件预览（Explorer / 桌面 QuickLook + Directory Opus 13） |
 | `EnableAcceleration` | `true` | `true` | 独立开关：基于硬件 `ScanTime` 的 S 型动态加速 |
 | `EnableMonitorCompensation` | `true` | `true` | 独立开关：多显示器物理尺寸与虚拟桌面绝对坐标补偿 |
-| `AccelerateWhilePressed` | `true` | `true` | 独立开关：物理按住拖拽期间是否继续应用 S 型加速 |
+| `AccelerateWhilePressed` | `false` | `false` | 默认关闭按住期间的 S 型加速，减少物理点击时细小位移被放大；单指按住拖拽仍可用，可在控制中心主动开启 |
+
+物理按压点击时，如果光标轻微上下抖动并导致单击失效，请在控制中心「指针手感」中关闭「按住拖拽时也加速」。主分支的配置模板及程序缺省值均已默认关闭；正常移动和跨屏曲线、深按力度及拖拽保护保持原设置。升级会保留已有配置，旧用户需按实际情况手动切换。详见[点击稳定性调整与验收说明](docs/click-stability.md)。
 
 <details>
 <summary><b>查看版本演进详情（v1.1.1 & v1.1.0 更新日志）</b></summary>

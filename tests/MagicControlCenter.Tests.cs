@@ -179,13 +179,18 @@ namespace MagicControlCenter.Tests
             options.DragCancelDistance = 375; options.DragCancelCursorPixels = 9; options.SpeedSmoothingMs = 24.5;
             var original = new System.Collections.Generic.Dictionary<string, object>();
             foreach (var field in typeof(ForceClickOptions).GetFields()) original[field.Name] = field.GetValue(options);
-            foreach (var preset in new[] { PointerPreset.Classic, PointerPreset.LightCrossScreen })
+            foreach (bool pressedAcceleration in new[] { false, true })
             {
-                ProfileCatalog.ApplyPointer(options, preset);
-                Equal(preset, ProfileCatalog.IdentifyPointer(options), "selected curve was not identified");
-                foreach (var field in typeof(ForceClickOptions).GetFields())
-                    if (field.Name != "MinGain" && field.Name != "MaxGain" && field.Name != "MidSpeed" && field.Name != "CurvePower")
-                        Equal(original[field.Name], field.GetValue(options), "preset changed " + field.Name);
+                options.AccelerateWhilePressed = pressedAcceleration;
+                original["AccelerateWhilePressed"] = pressedAcceleration;
+                foreach (var preset in new[] { PointerPreset.Classic, PointerPreset.LightCrossScreen })
+                {
+                    ProfileCatalog.ApplyPointer(options, preset);
+                    Equal(preset, ProfileCatalog.IdentifyPointer(options), "selected curve was not identified");
+                    foreach (var field in typeof(ForceClickOptions).GetFields())
+                        if (field.Name != "MinGain" && field.Name != "MaxGain" && field.Name != "MidSpeed" && field.Name != "CurvePower")
+                            Equal(original[field.Name], field.GetValue(options), "preset changed " + field.Name);
+                }
             }
             options.EnableForceClick = true;
             Equal("仅深按预览", ProfileCatalog.ModeName(options), "mode is conflated with curve");

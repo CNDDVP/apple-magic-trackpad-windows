@@ -81,8 +81,8 @@
     },
     {
         "Path":  "ControlCenter_Acceptance.json",
-        "Bytes":  2688,
-        "SHA256":  "307A6B52146E1DCF0115340FE4A577AB7B52950C87BEDF0070BCB2A009C5B680"
+        "Bytes":  4554,
+        "SHA256":  "2E2557E6509A1A4481BCCEABA07F7DB8959499A6C7A38385078E95E1AFD60F9C"
     },
     {
         "Path":  "docs/assets/control-center.png",
@@ -126,8 +126,8 @@
     },
     {
         "Path":  "docs/README.en.md",
-        "Bytes":  10835,
-        "SHA256":  "39B1A74880E31FC470A63408F04CB5A206D11E6268BFF03DD870582C27C86E73"
+        "Bytes":  11425,
+        "SHA256":  "EFDCFFD82DB8A9BBC619E9F6448045413F69B4BAC0379D183BD60CDB2C5A85CB"
     },
     {
         "Path":  "ForceClick修复说明_20261022.txt",
@@ -146,8 +146,8 @@
     },
     {
         "Path":  "MAGIC_CONTROL_CENTER.md",
-        "Bytes":  6835,
-        "SHA256":  "2D78F24E49D6F9B06AE3277608F62155BD390D8EB1EE456715ADF553A2FFE90C"
+        "Bytes":  7167,
+        "SHA256":  "291EE13B64F6A53E7A1588152C75B482BE39C7F28129F105D566F6E7B54AFA52"
     },
     {
         "Path":  "MagicControlCenter.Assembly.cs",
@@ -181,13 +181,13 @@
     },
     {
         "Path":  "MagicControlCenter/MAGIC_CONTROL_CENTER.md",
-        "Bytes":  6835,
-        "SHA256":  "2D78F24E49D6F9B06AE3277608F62155BD390D8EB1EE456715ADF553A2FFE90C"
+        "Bytes":  7167,
+        "SHA256":  "291EE13B64F6A53E7A1588152C75B482BE39C7F28129F105D566F6E7B54AFA52"
     },
     {
         "Path":  "MagicControlCenter/MagicControlCenter.exe",
         "Bytes":  147968,
-        "SHA256":  "1DA02D6A2A45D6C032A985F1D7E4816C9E0F88F66A1670026954F52D42320840"
+        "SHA256":  "154112F74294D1EF085C5B91E9E0C4611E2A40FA320E4301348CA32A30212C85"
     },
     {
         "Path":  "MagicControlCenter/MagicControlCenter.exe.config",
@@ -201,8 +201,8 @@
     },
     {
         "Path":  "MagicForceClick.Core.cs",
-        "Bytes":  13804,
-        "SHA256":  "FA83A9D222078F85DE77E2D05B7FB3EE881E2DC0276CCB72A67688A5601C9324"
+        "Bytes":  13922,
+        "SHA256":  "77E7BE5A86FD45B559E9C84F543E876A4D483BC6E7B48A8D27FABB48498E5102"
     },
     {
         "Path":  "MagicForceClick.cs",
@@ -212,12 +212,12 @@
     {
         "Path":  "MagicForceClick.exe",
         "Bytes":  35328,
-        "SHA256":  "D443CE689D7FC2CAE2467F310B757559CE9082809BC31420FC1461EC6A25401B"
+        "SHA256":  "4ACDC8039C746C8636B763CD6B9D47A707D67D41018108182113C2CF2F79C4A1"
     },
     {
         "Path":  "MagicForceClick.json",
-        "Bytes":  505,
-        "SHA256":  "2CDBA07543BA426899034638B1FC887219742F1C9345DD436CE1736FE69069BA"
+        "Bytes":  506,
+        "SHA256":  "C7A62FD1D63AA1D38A71A78F6394A99A8F0698BF1839A56CF71D38F3F9D0263D"
     },
     {
         "Path":  "MagicForceClick.Preview.cs",
@@ -266,8 +266,8 @@
     },
     {
         "Path":  "README.md",
-        "Bytes":  22334,
-        "SHA256":  "141E1E41D0C48D187ADE7C59ACC0821DC5680447E1C36AEF74EC050C93279020"
+        "Bytes":  22854,
+        "SHA256":  "AC9B0769CBFDA0AEEE3B3A4054F7C74FB82D50700291C654A5021EFBD4E431AD"
     },
     {
         "Path":  "README_AI配置指南.md",
@@ -381,8 +381,8 @@
     },
     {
         "Path":  "tests/MagicControlCenter.Tests.cs",
-        "Bytes":  25723,
-        "SHA256":  "1B0A5274075FA47BDF0C5EB29FBFF46602FC41A824E0680E722962EB5990C402"
+        "Bytes":  25999,
+        "SHA256":  "F82F2FB7AA9F02EAF846E91A64F1047C1BA4AB4BA39010D58958817994E6D6FD"
     },
     {
         "Path":  "tests/MagicControlCenter.UiTests.cs",
@@ -396,13 +396,13 @@
     },
     {
         "Path":  "tests/MagicForceClick.Tests.cs",
-        "Bytes":  22446,
-        "SHA256":  "52367780065956E1EA164E28F2B4E47CED6742C219710F188C6F29A7E12F8574"
+        "Bytes":  24412,
+        "SHA256":  "7B30384A011EE22B8F27348638A5DD52F81952B239E179DE6B98A9C6E3BDC49B"
     },
     {
         "Path":  "tests/Test-SuiteUpgrade.ps1",
-        "Bytes":  5262,
-        "SHA256":  "706CA2763A039E766EC293B4CCCCECC3056E30D2310A9D6513C720135C67503E"
+        "Bytes":  5426,
+        "SHA256":  "B907E5BFB4128153D8A99905CFC34D48EB843DA8CFE1AA5F107A0A33CEC3678A"
     },
     {
         "Path":  "tests/Test-UpdateRollback.ps1",
@@ -443,5 +443,10 @@
         "Path":  "一键配置妙控板(管理员运行).cmd",
         "Bytes":  276,
         "SHA256":  "C8CAF93CABD98EE9C9589E9FF6C4EA2632A1B3AC75A2ADBCD9572374E0C08E64"
+    },
+    {
+        "Path":  "docs/click-stability.md",
+        "Bytes":  2396,
+        "SHA256":  "277FA7A7B5E51F0B7C045EA0861E84AB8CECBA5A523F264BAED9E6B7FB71535B"
     }
 ]

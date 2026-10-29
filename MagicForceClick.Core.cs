@@ -33,7 +33,9 @@ namespace MagicForceClick
         private void Defaults()
         {
             SchemaVersion = 1;
-            EnableForceClick = EnableAcceleration = EnableMonitorCompensation = AccelerateWhilePressed = true;
+            EnableForceClick = EnableAcceleration = EnableMonitorCompensation = true;
+            // Keep physical clicks steady; held-button acceleration remains an explicit opt-in.
+            AccelerateWhilePressed = false;
             ForceClickThreshold = 180; ForceClickDwellMs = 0; ForceClickPressureRise = 0; ForceClickImmediateThreshold = 0; DragCancelDistance = 220; DragCancelCursorPixels = 4;
             MinGain = 0.95; MaxGain = 3.40; MidSpeed = 4.5; CurvePower = 1.85;
             // Equivalent to the previous 0.55 EMA at an 8 ms frame period.
